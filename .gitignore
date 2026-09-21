@@ -1,0 +1,36 @@
+# Build artifacts
+zig-out/
+.zig-cache/
+
+# Frontend
+node_modules/
+web/dist/
+mp/dist/
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local config
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test artifacts
+coverage/
+
+# zweq 原始引用（保留但不入仓）
+_ref/
+
+# Local dev
+mp/src/**/*.local.ts
+web/src/**/*.local.ts
+
+# zig debug
+*.pdb
+*.dSYM/

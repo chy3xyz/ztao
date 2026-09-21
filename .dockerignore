@@ -1,0 +1,14 @@
+# 不进镜像
+.git
+.DS_Store
+.zig-cache
+zig-out
+node_modules
+web/dist
+mp/dist
+docs
+_ref
+*.md
+!mp/README.md
+!web/README.md
+!docs/COMPLIANCE.md

@@ -1,0 +1,77 @@
+version: "3.9"
+
+# ztao — 公网 SaaS 部署编排
+#
+# - postgres: 主库
+# - ztao:     后端 binary（自带 Vue 3 SPA 静态资源）
+# - minio:    对象存储（M2+ 用；M1 占位）
+#
+# 启动：
+#   ZTAO_JWT_SECRET=$(openssl rand -hex 32) \
+#   ZTAO_AI_KEY_SECRET=$(openssl rand -hex 32) \
+#   docker compose up -d
+#
+# 健康检查：
+#   curl http://localhost:8080/api/v1/mp/health
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ztao
+      POSTGRES_PASSWORD: ztao_dev
+      POSTGRES_DB: ztao
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ztao -d ztao"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ztao:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ZTAO_DB_DRIVER: postgres
+      ZTAO_PG_CONNINFO: postgres://ztao:ztao_dev@postgres:5432/ztao
+      ZTAO_JWT_SECRET: ${ZTAO_JWT_SECRET:-change-me-please}
+      ZTAO_AI_KEY_SECRET: ${ZTAO_AI_KEY_SECRET:-change-me-please}
+      ZTAO_HTTP_PORT: "8000"
+      # 小程序（M4 之前用体验号，先把环境变量写好）
+      ZTAO_MP_APPID: ${ZTAO_MP_APPID:-wx_test}
+      ZTAO_MP_SECRET: ${ZTAO_MP_SECRET:-test-secret}
+      ZTAO_DEFAULT_PLAN: free
+      # 上传目录（M1 用本地磁盘，M2 换 OSS / MinIO）
+      ZTAO_UPLOAD_DIR: /data/uploads
+      ZTAO_STATIC_DIR: /app/web/dist
+    ports:
+      - "8080:8000"
+    volumes:
+      - ztao_data:/data
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  pg_data:
+  ztao_data:
+  minio_data:

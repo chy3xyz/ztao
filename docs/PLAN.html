@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ztao · 产品技术方案 v0.2 — 一人公司</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --line: #e9e3d6;
+  --line-soft: #f0ead9;
+  --ink: #14171e;
+  --ink-2: #3a4256;
+  --muted: #7c7a72;
+  --primary: #2f6f5e;        /* 禅意绿 */
+  --primary-soft: rgba(47,111,94,.08);
+  --accent: #c97b3f;          /* 禅意橘 */
+  --accent-soft: rgba(201,123,63,.10);
+  --warn: #b06367;
+  --gift: #b06367;
+  --gift-soft: rgba(176,99,103,.08);
+  --accessory: #4a6a8c;
+  --accessory-soft: rgba(74,106,140,.08);
+  --compute: #c97b3f;
+  --compute-soft: rgba(201,123,63,.10);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 15px; line-height: 1.6;
+  color: var(--ink);
+  background: var(--bg);
+  background-image:
+    radial-gradient(at 12% 8%, rgba(47,111,94,.05) 0%, transparent 45%),
+    radial-gradient(at 88% 92%, rgba(201,123,63,.05) 0%, transparent 45%);
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 1080px; margin: 0 auto; padding: 56px 24px 80px; }
+
+/* ---------- Hero ---------- */
+.hero { padding: 40px 0 56px; border-bottom: 1px solid var(--line); margin-bottom: 48px; }
+.hero .tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary);
+  font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.hero .tag::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--primary);
+}
+h1 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400; font-size: 56px; line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+}
+h1 .accent { color: var(--primary); font-style: italic; }
+.hero .lede {
+  font-size: 18px; line-height: 1.55; color: var(--ink-2);
+  max-width: 760px; margin: 0 0 28px;
+}
+.hero-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 14px; margin-top: 32px;
+}
+.hero-stat {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 18px 20px;
+}
+.hero-stat .num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px; color: var(--primary); line-height: 1;
+  margin-bottom: 6px;
+}
+.hero-stat .lbl { font-size: 12px; color: var(--muted); }
+
+/* ---------- Section base ---------- */
+section { margin-bottom: 64px; }
+.section-header {
+  display: flex; align-items: baseline; gap: 14px;
+  margin-bottom: 24px;
+}
+.section-header .num {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--accent); font-weight: 500;
+  letter-spacing: .12em;
+}
+h2 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400; font-size: 32px; line-height: 1.15;
+  margin: 0; letter-spacing: -.005em;
+}
+.section-desc { color: var(--ink-2); margin: -8px 0 24px; max-width: 760px; }
+
+/* ---------- Mobile frame ---------- */
+.phone {
+  width: 280px; border-radius: 28px; padding: 8px;
+  background: #1a1a2e;
+  box-shadow: 0 12px 32px -8px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.04);
+}
+.phone-screen {
+  background: #ffffff; border-radius: 22px; overflow: hidden;
+  height: 560px; display: flex; flex-direction: column;
+}
+.phone-statusbar {
+  height: 22px; background: #f5f5f5;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; font-size: 10px; color: #14171e;
+  font-weight: 600;
+}
+.phone-content { flex: 1; overflow-y: auto; padding: 14px; background: #fafafa; }
+.phone-tabbar {
+  height: 48px; background: white;
+  border-top: 1px solid #e9e3d6;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  font-size: 10px; color: #7c7a72;
+  align-items: center; text-align: center;
+}
+.phone-tabbar div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.phone-tabbar .active { color: var(--primary); font-weight: 600; }
+
+/* ---------- Mini-program preview ---------- */
+.mp-row {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 16px; align-items: start;
+}
+.mp-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px;
+}
+.mp-card h3 {
+  margin: 0 0 4px; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+}
+.mp-card .icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: white; font-size: 14px;
+}
+.mp-card .label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); margin-bottom: 10px;
+}
+.mp-card ul { list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--ink-2); }
+.mp-card ul li { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.mp-card ul li:last-child { border: none; }
+.mp-card ul li::before { content: "·"; color: var(--primary); margin-right: 6px; font-weight: bold; }
+
+/* ---------- Mini-phone content mock ---------- */
+.mock-title { font-size: 13px; font-weight: 600; margin: 4px 0 8px; }
+.mock-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #e9e3d6; }
+.mock-row:last-child { border: none; }
+.mock-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 9px; font-weight: 600;
+}
+.mock-text { flex: 1; font-size: 10px; color: var(--ink-2); }
+.mock-meta { font-size: 9px; color: var(--muted); }
+.mock-tag {
+  font-size: 9px; padding: 1px 6px; border-radius: 3px;
+  background: var(--accent-soft); color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+.mock-tag.pri { background: var(--gift-soft); color: var(--gift); }
+.mock-tag.ai { background: var(--primary-soft); color: var(--primary); }
+.mock-metric {
+  background: white; border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px; text-align: center;
+  margin-bottom: 8px;
+}
+.mock-metric .v { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--primary); }
+.mock-metric .l { font-size: 9px; color: var(--muted); }
+.mock-chat { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 6px; font-size: 10px; }
+.mock-chat.user { background: var(--primary-soft); }
+.mock-chat .who { font-size: 9px; color: var(--muted); margin-bottom: 2px; }
+.mock-banner {
+  height: 40px; border-radius: 6px; margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--gift), var(--compute));
+  display: flex; align-items: center; padding: 0 12px;
+  color: white; font-size: 11px; font-weight: 600;
+}
+
+/* ---------- Three malls ---------- */
+.malls {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+.mall {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 22px;
+  border-top: 4px solid var(--line);
+}
+.mall.gift { border-top-color: var(--gift); }
+.mall.accessory { border-top-color: var(--accessory); }
+.mall.compute { border-top-color: var(--compute); }
+.mall h3 {
+  margin: 0 0 4px; font-size: 18px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+}
+.mall .emoji { font-size: 22px; }
+.mall .label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--muted); letter-spacing: .08em;
+  text-transform: uppercase; margin-bottom: 12px;
+}
+.mall .scenario { color: var(--ink-2); font-size: 13px; margin-bottom: 14px; }
+.mall .modules {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;
+}
+.mall .modules span {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  padding: 3px 7px; border-radius: 4px;
+  background: var(--line-soft); color: var(--ink-2);
+}
+.mall .modules .new {
+  background: var(--accent-soft); color: var(--accent);
+}
+.mall .price { font-size: 12px; color: var(--ink-2); }
+.mall .price b { color: var(--ink); }
+.mall.gift .price b { color: var(--gift); }
+.mall.accessory .price b { color: var(--accessory); }
+.mall.compute .price b { color: var(--compute); }
+
+/* ---------- AI Agents ---------- */
+.agents {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+}
+.agent {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 18px;
+  text-align: center;
+  transition: transform .2s, box-shadow .2s;
+}
+.agent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px -2px rgba(0,0,0,.06);
+}
+.agent .av {
+  width: 48px; height: 48px; border-radius: 50%;
+  margin: 0 auto 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 22px;
+}
+.agent.pm .av { background: linear-gradient(135deg, #2f6f5e, #5a9d8a); }
+.agent.dev .av { background: linear-gradient(135deg, #c97b3f, #e0a26f); }
+.agent.qa .av { background: linear-gradient(135deg, #4a6a8c, #7a9ab5); }
+.agent.support .av { background: linear-gradient(135deg, #b06367, #d08a8e); }
+.agent.ops .av { background: linear-gradient(135deg, #6a4a8c, #957ab5); }
+.agent .code {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--muted); margin-bottom: 4px;
+}
+.agent .name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.agent .desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ---------- Architecture ---------- */
+.arch {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 24px;
+}
+.arch-svg { width: 100%; height: auto; display: block; }
+
+/* ---------- Module grid ---------- */
+.module-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.module {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px;
+}
+.module .name {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  font-weight: 600; color: var(--ink); margin-bottom: 4px;
+}
+.module .desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.module.new { background: var(--accent-soft); border-color: var(--accent); }
+.module.new .name { color: var(--accent); }
+.module.mall { background: var(--gift-soft); border-color: var(--gift); }
+.module.mall .name { color: var(--gift); }
+
+/* ---------- Day-one loop ---------- */
+.loop {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 24px;
+}
+.loop-steps { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.loop-step {
+  text-align: center; padding: 12px 8px;
+  background: var(--bg); border-radius: 8px;
+  font-size: 11px; color: var(--ink-2);
+  position: relative;
+}
+.loop-step .num {
+  font-family: 'DM Serif Display', serif; font-size: 22px;
+  color: var(--primary); display: block; margin-bottom: 4px;
+}
+
+/* ---------- RBAC ---------- */
+.rbac-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+}
+.role {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px;
+}
+.role .code {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--primary); font-weight: 600; margin-bottom: 6px;
+}
+.role .name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.role .desc { font-size: 11px; color: var(--muted); }
+.role.aiagent { background: var(--accent-soft); border-color: var(--accent); }
+.role.aiagent .code { color: var(--accent); }
+
+/* ---------- Roadmap ---------- */
+.timeline { list-style: none; padding: 0; margin: 0; position: relative; }
+.timeline::before {
+  content: ""; position: absolute; left: 8px; top: 6px; bottom: 6px;
+  width: 2px; background: var(--primary); opacity: .3;
+}
+.timeline li {
+  position: relative; padding: 0 0 22px 36px;
+}
+.timeline li::before {
+  content: ""; position: absolute; left: 2px; top: 4px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--primary);
+}
+.timeline .milestone {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--accent); font-weight: 600; letter-spacing: .08em;
+  margin-bottom: 4px;
+}
+.timeline .title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.timeline .body { color: var(--ink-2); font-size: 13px; }
+.timeline .body .tag {
+  display: inline-block; font-size: 10px; padding: 1px 6px;
+  border-radius: 3px; background: var(--primary-soft); color: var(--primary);
+  font-family: 'JetBrains Mono', monospace;
+  margin-left: 6px;
+}
+
+/* ---------- Anti-slop ---------- */
+@media (max-width: 768px) {
+  h1 { font-size: 36px; }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); }
+  .mp-row { grid-template-columns: 1fr; }
+  .malls, .agents, .module-grid, .rbac-grid { grid-template-columns: repeat(2, 1fr); }
+  .loop-steps { grid-template-columns: repeat(2, 1fr); }
+  section { margin-bottom: 48px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="tag">v0.2 · One-Person Company · AI-Native PM · 微信小程序优先</div>
+    <h1>一个人，也能跑一家公司 <br><span class="accent">ztao</span></h1>
+    <p class="lede">
+      AI 团队 + PM 工具 + 微信小程序 + 三套小商城 = 一人公司的全部基础设施。<br>
+      注册 1 分钟，拿到 5 名 AI 员工 + 一个工作台 + 一个商城。早上说一句"今天做 X"，晚上看仪表盘知道花了多少钱、产出了什么。
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">1 人</div><div class="lbl">目标用户：一人公司</div></div>
+      <div class="hero-stat"><div class="num">5 名 AI</div><div class="lbl">预置 Agent：PM/Dev/QA/Support/Ops</div></div>
+      <div class="hero-stat"><div class="num">3 套</div><div class="lbl">商城：礼品 / 配件 / 算力</div></div>
+      <div class="hero-stat"><div class="num">4 Tab</div><div class="lbl">小程序：工作台 / 项目 / 商城 / 我的</div></div>
+    </div>
+  </header>
+
+  <!-- 1. 一人公司痛点与解 -->
+  <section>
+    <div class="section-header"><span class="num">01</span><h2>为什么是一人公司</h2></div>
+    <p class="section-desc">一人公司 / 独立产品人 / 工作室最常面对 6 个问题：人手、成本、工具、碎片化、移动、数据归属。ztao 用 AI + 小程序 + 商城逐一解决。</p>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+      <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;">
+        <div style="font-weight:600;margin-bottom:8px;color:var(--ink-2);">🤔 痛点</div>
+        <ol style="margin:0;padding-left:20px;font-size:13px;color:var(--ink-2);">
+          <li>一个人做所有事：产品 / 开发 / 测试 / 销售 / 客服 / 财务</li>
+          <li>缺人手：没有 QA、没有设计师、没有运营</li>
+          <li>缺工具链：Jira 太重、Notion 太散、禅道太传统</li>
+          <li>成本敏感：月费不能超过一杯咖啡</li>
+          <li>移动为先：灵感在路上、对话在客户那里</li>
+          <li>数据归属：必须能随时带走全部数据</li>
+        </ol>
+      </div>
+      <div style="background:var(--primary-soft);border:1px solid var(--primary);border-radius:12px;padding:18px;">
+        <div style="font-weight:600;margin-bottom:8px;color:var(--primary);">✨ ztao 的解</div>
+        <ol style="margin:0;padding-left:20px;font-size:13px;color:var(--ink-2);">
+          <li><b>AI 团队</b>：1 名 Founder + 5 名 Agent（产品 / 开发 / 测试 / 客服 / 运营）</li>
+          <li><b>小程序为主</b>：手机里能完成 80% 工作</li>
+          <li><b>极简录入</b>：语音 / 拍照 / 转写 → 自动归类</li>
+          <li><b>透明账单</b>：每个 AI 员工的工资 = token 成本</li>
+          <li><b>商城闭环</b>：客户礼品 / 办公配件 / 加算力，一个就够</li>
+          <li><b>数据出境</b>：一键导出全量 JSON / CSV</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 小程序端预览 -->
+  <section>
+    <div class="section-header"><span class="num">02</span><h2>小程序端（用户主入口）</h2></div>
+    <p class="section-desc">Taro 4 + React + TS。4 个 Tab + 40+ 页面。能用小程序完成的，绝不引导去 Web。</p>
+
+    <div class="mp-row">
+
+      <!-- 工作台 -->
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-statusbar"><span>9:41</span><span>📶 100%</span></div>
+          <div class="phone-content">
+            <div class="mock-title">早，Founder</div>
+            <div class="mock-metric"><div class="v">¥12.40</div><div class="l">今日 token · ¥12.40</div></div>
+            <div class="mock-metric"><div class="v">3</div><div class="l">待办 · 2 Agent 跑任务</div></div>
+            <div style="font-size:11px;color:var(--muted);margin:8px 0 4px;">AI 团队</div>
+            <div class="mock-row">
+              <div class="mock-avatar">P</div>
+              <div class="mock-text">PM Agent · 空闲</div>
+              <div class="mock-tag ai">ON</div>
+            </div>
+            <div class="mock-row">
+              <div class="mock-avatar">D</div>
+              <div class="mock-text">Dev Agent · 正在跑</div>
+              <div class="mock-tag">3/5</div>
+            </div>
+            <div class="mock-row">
+              <div class="mock-avatar">Q</div>
+              <div class="mock-text">QA Agent · 空闲</div>
+              <div class="mock-tag ai">ON</div>
+            </div>
+          </div>
+          <div class="phone-tabbar">
+            <div class="active">🏠<br>工作台</div>
+            <div>📁<br>项目</div>
+            <div>🛍<br>商城</div>
+            <div>👤<br>我的</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 项目 -->
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-statusbar"><span>9:41</span><span>📶 100%</span></div>
+          <div class="phone-content">
+            <div class="mock-title">ztao MVP</div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">迭代 12 · 第 3 天 · 燃尽正常</div>
+            <div class="mock-row">
+              <div style="flex:1;">
+                <div style="font-size:11px;font-weight:600;">写需求模板</div>
+                <div class="mock-meta">PM Agent · 已完成 · 12 min</div>
+              </div>
+              <div class="mock-tag" style="background:var(--primary-soft);color:var(--primary);">DONE</div>
+            </div>
+            <div class="mock-row">
+              <div style="flex:1;">
+                <div style="font-size:11px;font-weight:600;">改支付回调</div>
+                <div class="mock-meta">Dev Agent · 跑中</div>
+              </div>
+              <div class="mock-tag">RUN</div>
+            </div>
+            <div class="mock-row">
+              <div style="flex:1;">
+                <div style="font-size:11px;font-weight:600;">#102 登录卡顿</div>
+                <div class="mock-meta">QA Agent · 待处理</div>
+              </div>
+              <div class="mock-tag pri">BUG</div>
+            </div>
+            <div class="mock-row">
+              <div style="flex:1;">
+                <div style="font-size:11px;font-weight:600;">5 个回归用例</div>
+                <div class="mock-meta">QA Agent · 待跑</div>
+              </div>
+              <div class="mock-tag">TODO</div>
+            </div>
+          </div>
+          <div class="phone-tabbar">
+            <div>🏠<br>工作台</div>
+            <div class="active">📁<br>项目</div>
+            <div>🛍<br>商城</div>
+            <div>👤<br>我的</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 商城 -->
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-statusbar"><span>9:41</span><span>📶 100%</span></div>
+          <div class="phone-content">
+            <div class="mock-banner">🎁 三套商城</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:10px;margin-bottom:8px;text-align:center;">
+              <div style="padding:6px;background:var(--gift-soft);color:var(--gift);border-radius:6px;">礼品</div>
+              <div style="padding:6px;background:var(--accessory-soft);color:var(--accessory);border-radius:6px;">配件</div>
+              <div style="padding:6px;background:var(--compute-soft);color:var(--compute);border-radius:6px;">算力</div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">本月推荐 · 算力月包</div>
+            <div class="mock-metric"><div class="v">¥29</div><div class="l">Lite · 200k token / 月</div></div>
+            <div class="mock-metric"><div class="v">¥99</div><div class="l">Pro · 1M token / 月</div></div>
+            <div class="mock-metric"><div class="v">¥299</div><div class="l">Team · 5 席 · 3M</div></div>
+          </div>
+          <div class="phone-tabbar">
+            <div>🏠<br>工作台</div>
+            <div>📁<br>项目</div>
+            <div class="active">🛍<br>商城</div>
+            <div>👤<br>我的</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 对话 -->
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-statusbar"><span>9:41</span><span>📶 100%</span></div>
+          <div class="phone-content">
+            <div class="mock-title">PM Agent</div>
+            <div class="mock-chat user">
+              <div class="who">你 · 09:12</div>
+              <div>我想做一个登录功能，让用户用手机号一键登录</div>
+            </div>
+            <div class="mock-chat">
+              <div class="who">PM Agent · 09:12</div>
+              <div>好的，我帮你写好了 PRD。已创建 #12 需求 · 拆 3 个任务 · 通知 Dev Agent<br><br>📎 PRD 草稿</div>
+            </div>
+            <div class="mock-chat user">
+              <div class="who">你 · 09:13</div>
+              <div>让 Dev 跑起来，但部署前停下</div>
+            </div>
+            <div class="mock-chat">
+              <div class="who">PM Agent · 09:13</div>
+              <div>已发 Dev Agent，需要审批：<br>⚠️ deploy · 等你确认</div>
+            </div>
+          </div>
+          <div class="phone-tabbar">
+            <div class="active">🏠<br>工作台</div>
+            <div>📁<br>项目</div>
+            <div>🛍<br>商城</div>
+            <div>👤<br>我的</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3. 三套商城 -->
+  <section>
+    <div class="section-header"><span class="num">03</span><h2>三套商城</h2></div>
+    <p class="section-desc">zweq 原生商城模块（shop / coupon / points / member_card / seckill / vote / lucky_draw / distribution / material）全部保留，按用途重组为三套。</p>
+
+    <div class="malls">
+      <div class="mall gift">
+        <h3><span class="emoji">🎁</span>礼品商城</h3>
+        <div class="label">gift mall</div>
+        <div class="scenario">任务达成 / 节日福利 / 客户答谢 / 邀请奖励</div>
+        <div class="modules">
+          <span>shop</span><span>coupon</span><span>points</span>
+          <span>member_card</span><span>seckill</span><span>lucky_draw</span>
+          <span>vote</span><span>distribution</span><span>material</span>
+          <span class="new">task_redeem</span>
+        </div>
+        <div class="price">定价：<b>现金 + 积分 + 券</b></div>
+      </div>
+
+      <div class="mall accessory">
+        <h3><span class="emoji">🛠</span>配件商城</h3>
+        <div class="label">accessory mall</div>
+        <div class="scenario">硬件 / 工具 SaaS / 模板 / 课程 / 实体书</div>
+        <div class="modules">
+          <span>shop</span><span>material</span><span>menu</span>
+          <span>coupon</span>
+          <span class="new">asset_register</span>
+        </div>
+        <div class="price">定价：<b>现金</b></div>
+      </div>
+
+      <div class="mall compute">
+        <h3><span class="emoji">⚡</span>算力商城</h3>
+        <div class="label">compute mall</div>
+        <div class="scenario">AI Token / 模型包 / 团队席位 / 工具调用</div>
+        <div class="modules">
+          <span>payment</span><span>cloud</span>
+          <span class="new">compute_pkg</span>
+          <span class="new">compute_order</span>
+          <span class="new">compute_balance</span>
+          <span class="new">usage_meter</span>
+        </div>
+        <div class="price">定价：<b>现金 + 自动充值</b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. AI 团队 -->
+  <section>
+    <div class="section-header"><span class="num">04</span><h2>预置 AI 团队（一人公司的"员工"）</h2></div>
+    <p class="section-desc">注册即送 5 名 Agent 模板。Agent 是一等公民：可被指派任务、消耗算力、产生审计日志、需要人工审批高危操作。</p>
+
+    <div class="agents">
+      <div class="agent pm">
+        <div class="av">📋</div>
+        <div class="code">pm</div>
+        <div class="name">产品 Agent</div>
+        <div class="desc">写需求 / 拆任务 / 评审 / 出方案</div>
+      </div>
+      <div class="agent dev">
+        <div class="av">💻</div>
+        <div class="code">dev</div>
+        <div class="name">开发 Agent</div>
+        <div class="desc">编码 / 改 Bug / 重构 / 提 PR</div>
+      </div>
+      <div class="agent qa">
+        <div class="av">🧪</div>
+        <div class="code">qa</div>
+        <div class="name">测试 Agent</div>
+        <div class="desc">写用例 / 跑测试 / 回归 / 报告</div>
+      </div>
+      <div class="agent support">
+        <div class="av">🎧</div>
+        <div class="code">support</div>
+        <div class="name">客服 Agent</div>
+        <div class="desc">回答工单 / 路由 / 复盘</div>
+      </div>
+      <div class="agent ops">
+        <div class="av">📊</div>
+        <div class="code">ops</div>
+        <div class="name">运营 Agent</div>
+        <div class="desc">监控 / 报表 / 提醒 / 排程</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. 架构 -->
+  <section>
+    <div class="section-header"><span class="num">05</span><h2>整体架构</h2></div>
+    <p class="section-desc">前端双端：Taro 4 小程序（主）+ Vue 3 Web 后台（次）。后端统一在 zweq 的 Zig runtime 上扩展。</p>
+
+    <div class="arch">
+      <svg class="arch-svg" viewBox="0 0 920 460" xmlns="http://www.w3.org/2000/svg">
+        <!-- Frontends -->
+        <rect x="40" y="20" width="420" height="56" rx="10" fill="rgba(47,111,94,.06)" stroke="#2f6f5e"/>
+        <text x="60" y="44" font-family="Outfit" font-size="13" font-weight="600" fill="#2f6f5e">微信小程序 (Taro 4 + React)</text>
+        <text x="60" y="62" font-family="Outfit" font-size="11" fill="#3a4256">工作台 · 项目 · 商城 · 我的 · AI 对话</text>
+
+        <rect x="480" y="20" width="400" height="56" rx="10" fill="#ffffff" stroke="#e9e3d6"/>
+        <text x="500" y="44" font-family="Outfit" font-size="13" font-weight="600" fill="#14171e">Web 后台 (Vue 3 + TS)</text>
+        <text x="500" y="62" font-family="Outfit" font-size="11" fill="#7c7a72">PM · AI · Mall · SaaS · Admin</text>
+
+        <!-- API -->
+        <rect x="40" y="100" width="840" height="46" rx="8" fill="#f0ead9" stroke="#e9e3d6"/>
+        <text x="60" y="122" font-family="Outfit" font-size="12" font-weight="600" fill="#3a4256">REST API</text>
+        <text x="60" y="137" font-family="JetBrains Mono" font-size="10" fill="#7c7a72">/api/v1/mp/* · /api/v1/* · Webhook · SSE · WS · Pay v3 回调</text>
+
+        <!-- Modules -->
+        <rect x="40" y="170" width="840" height="100" rx="10" fill="#ffffff" stroke="#e9e3d6"/>
+        <text x="60" y="195" font-family="Outfit" font-size="12" font-weight="600" fill="#14171e">Domain Modules (model → persistence → service → api → module)</text>
+        <text x="60" y="218" font-family="JetBrains Mono" font-size="10" fill="#3a4256">
+          <tspan fill="#2f6f5e" font-weight="600">base:</tspan> tenant · user · role · permission · fan · identity
+        </text>
+        <text x="60" y="236" font-family="JetBrains Mono" font-size="10" fill="#3a4256">
+          <tspan fill="#2f6f5e" font-weight="600">pm  :</tspan> product · project · sprint · story · task · bug · testcase · build · doc
+        </text>
+        <text x="60" y="254" font-family="JetBrains Mono" font-size="10" fill="#3a4256">
+          <tspan fill="#c97b3f" font-weight="600">ai  :</tspan> ai · aiagent · aiprompt · aiworkflow
+        </text>
+        <text x="480" y="218" font-family="JetBrains Mono" font-size="10" fill="#3a4256">
+          <tspan fill="#b06367" font-weight="600">mall:</tspan> shop · coupon · points · distribution · member_card
+        </text>
+        <text x="480" y="236" font-family="JetBrains Mono" font-size="10" fill="#3a4256">      seckill · lucky_draw · vote · material · menu · payment · cloud</text>
+        <text x="480" y="254" font-family="JetBrains Mono" font-size="10" fill="#3a4256">
+          <tspan fill="#b06367" font-weight="600">new :</tspan> compute_pkg · compute_order · compute_balance · usage
+        </text>
+
+        <!-- Middleware -->
+        <rect x="40" y="290" width="840" height="46" rx="8" fill="#ffffff" stroke="#e9e3d6"/>
+        <text x="60" y="312" font-family="Outfit" font-size="12" font-weight="600" fill="#14171e">Middleware</text>
+        <text x="60" y="327" font-family="JetBrains Mono" font-size="10" fill="#7c7a72">jwtAuth · tokenVersionGuard · catalog_permissions · rate_limit · license · mp_auth · envelope</text>
+
+        <!-- Data + AI -->
+        <rect x="40" y="360" width="410" height="76" rx="10" fill="#ffffff" stroke="#e9e3d6"/>
+        <text x="60" y="384" font-family="Outfit" font-size="13" font-weight="600" fill="#14171e">Postgres / SQLite</text>
+        <text x="60" y="402" font-family="JetBrains Mono" font-size="10" fill="#7c7a72">zent ORM · 自动迁移 · tenant_id 物理列</text>
+        <text x="60" y="420" font-family="JetBrains Mono" font-size="10" fill="#7c7a72">单 binary · 跨租户物理隔离</text>
+
+        <rect x="470" y="360" width="410" height="76" rx="10" fill="rgba(201,123,63,.08)" stroke="#c97b3f"/>
+        <text x="490" y="384" font-family="Outfit" font-size="13" font-weight="600" fill="#c97b3f">AI Provider 适配</text>
+        <text x="490" y="402" font-family="JetBrains Mono" font-size="10" fill="#3a4256">openai · claude · qwen · doubao · ollama</text>
+        <text x="490" y="420" font-family="JetBrains Mono" font-size="10" fill="#3a4256">每次 Run 落 token + cost · 算力自动扣减</text>
+
+        <!-- arrows -->
+        <line x1="250" y1="76" x2="250" y2="100" stroke="#7c7a72" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="680" y1="76" x2="680" y2="100" stroke="#7c7a72" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="460" y1="123" x2="460" y2="170" stroke="#7c7a72" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="460" y1="270" x2="460" y2="290" stroke="#7c7a72" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="250" y1="336" x2="250" y2="360" stroke="#7c7a72" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="675" y1="336" x2="675" y2="360" stroke="#7c7a72" stroke-width="1" stroke-dasharray="3,3"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- 6. 模块清单 -->
+  <section>
+    <div class="section-header"><span class="num">06</span><h2>模块清单</h2></div>
+    <p class="section-desc">base / pm / ops 全部直接复用 zweq；mall 全部保留；ai 扩展；saas 新增。</p>
+
+    <div class="module-grid">
+      <div class="module"><div class="name">tenant · user</div><div class="desc">基础</div></div>
+      <div class="module"><div class="name">role · permission</div><div class="desc">RBAC</div></div>
+      <div class="module"><div class="name">fan · identity</div><div class="desc">微信身份</div></div>
+      <div class="module"><div class="name">product · project</div><div class="desc">PM 核心</div></div>
+      <div class="module"><div class="name">sprint · story</div><div class="desc">迭代/需求</div></div>
+      <div class="module"><div class="name">task · bug</div><div class="desc">任务/缺陷</div></div>
+      <div class="module"><div class="name">testcase · build</div><div class="desc">用例/版本</div></div>
+      <div class="module"><div class="name">doc</div><div class="desc">文档</div></div>
+      <div class="module"><div class="name">ai</div><div class="desc">AI Provider</div></div>
+      <div class="module new"><div class="name">aiagent</div><div class="desc">虚拟员工</div></div>
+      <div class="module new"><div class="name">aiprompt · aiworkflow</div><div class="desc">提示词/工作流</div></div>
+      <div class="module"><div class="name">audit · notification</div><div class="desc">运维</div></div>
+      <div class="module"><div class="name">webhook · file</div><div class="desc">运维</div></div>
+      <div class="module mall"><div class="name">shop · material</div><div class="desc">商城基础</div></div>
+      <div class="module mall"><div class="name">coupon · points</div><div class="desc">券/积分</div></div>
+      <div class="module mall"><div class="name">member_card</div><div class="desc">会员卡</div></div>
+      <div class="module mall"><div class="name">seckill · lucky_draw</div><div class="desc">秒杀/抽奖</div></div>
+      <div class="module mall"><div class="name">vote · distribution</div><div class="desc">投票/分销</div></div>
+      <div class="module mall"><div class="name">menu · payment</div><div class="desc">菜单/支付</div></div>
+      <div class="module"><div class="name">cloud</div><div class="desc">License</div></div>
+      <div class="module new"><div class="name">compute_pkg / order / balance</div><div class="desc">算力商城</div></div>
+      <div class="module new"><div class="name">usage · subscription · billing</div><div class="desc">用量/订阅</div></div>
+    </div>
+  </section>
+
+  <!-- 7. RBAC -->
+  <section>
+    <div class="section-header"><span class="num">07</span><h2>RBAC（一人多角）</h2></div>
+    <p class="section-desc">支持"身份切换"——一人公司创始人一人多角，每种身份激活对应 Agent 与工具集。</p>
+
+    <div class="rbac-grid">
+      <div class="role"><div class="code">founder</div><div class="name">创始人</div><div class="desc">一切 + 计费（默认）</div></div>
+      <div class="role"><div class="code">admin</div><div class="name">管理员</div><div class="desc">PM + 团队管理</div></div>
+      <div class="role"><div class="code">pm</div><div class="name">PM</div><div class="desc">产品/需求/文档</div></div>
+      <div class="role"><div class="code">rd</div><div class="name">研发</div><div class="desc">任务/Bug/代码</div></div>
+      <div class="role"><div class="code">qa</div><div class="name">测试</div><div class="desc">用例/Bug 验证</div></div>
+      <div class="role"><div class="code">sales</div><div class="name">销售</div><div class="desc">商城/客户/工单</div></div>
+      <div class="role"><div class="code">viewer</div><div class="name">只读</div><div class="desc">只读</div></div>
+      <div class="role aiagent"><div class="code">aiagent</div><div class="name">AI 员工</div><div class="desc">受 tool scope 约束</div></div>
+    </div>
+  </section>
+
+  <!-- 8. Day-One 闭环 -->
+  <section>
+    <div class="section-header"><span class="num">08</span><h2>Day-One 价值闭环</h2></div>
+    <p class="section-desc">注册 1 分钟，拿到一家"数字公司" + 5 名 AI 员工 + 小程序入口 + 商城。</p>
+
+    <div class="loop">
+      <div class="loop-steps">
+        <div class="loop-step"><span class="num">1</span>注册</div>
+        <div class="loop-step"><span class="num">2</span>5 Agent</div>
+        <div class="loop-step"><span class="num">3</span>小程序</div>
+        <div class="loop-step"><span class="num">4</span>PM 写需求</div>
+        <div class="loop-step"><span class="num">5</span>Dev 拆任务</div>
+        <div class="loop-step"><span class="num">6</span>QA 写用例</div>
+        <div class="loop-step"><span class="num">7</span>¥1 买 token</div>
+        <div class="loop-step"><span class="num">8</span>月底看账</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. 路线图 -->
+  <section>
+    <div class="section-header"><span class="num">09</span><h2>路线图（小程序优先）</h2></div>
+    <p class="section-desc">6 个里程碑，预计 15 周完成 MVP。</p>
+    <ol class="timeline">
+      <li>
+        <div class="milestone">M0 · NOW</div>
+        <div class="title">方案与脚手架</div>
+        <div class="body">v0.2 方案 + README + 三份设计文档<span class="tag">已完成</span></div>
+      </li>
+      <li>
+        <div class="milestone">M1 · 2 周</div>
+        <div class="title">骨架 + 小程序登录</div>
+        <div class="body">迁移 zweq 工程；注册基础 schema；jscode2session；小程序 Taro 4 脚手架；一人公司引导流</div>
+      </li>
+      <li>
+        <div class="milestone">M2 · 4 周</div>
+        <div class="title">PM 核心 + 工作台</div>
+        <div class="body">PM 模块 schema + API；小程序工作台 Tab + 项目 Tab；语音录入；Web 后台 PM 视图</div>
+      </li>
+      <li>
+        <div class="milestone">M3 · 3 周</div>
+        <div class="title">AI Copilot + Agent 团队</div>
+        <div class="body">AI Providers；5 个 Agent 模板注册；小程序 AI 对话气泡；Agent 可被指派任务；审批 + 成本</div>
+      </li>
+      <li>
+        <div class="milestone">M4 · 3 周</div>
+        <div class="title">算力商城 + 支付</div>
+        <div class="body">Plan / Compute Package / Order / Balance；微信支付 v3；用量计量 + 阈值；耗尽降级</div>
+      </li>
+      <li>
+        <div class="milestone">M5 · 3 周</div>
+        <div class="title">礼品 + 配件商城</div>
+        <div class="body">复用 zweq 全套商城模块；三 Tab 商城；任务奖励自动发券；资产自动登记</div>
+      </li>
+      <li>
+        <div class="milestone">M6 · 持续</div>
+        <div class="title">集成 + 打磨</div>
+        <div class="body">飞书/企微；Git/Jenkins；OpenAPI；SSO；多语言；多区域</div>
+      </li>
+    </ol>
+  </section>
+
+  <footer style="border-top: 1px solid var(--line); padding-top: 28px; color: var(--muted); font-size: 13px; text-align: center;">
+    ztao · 基于 <a href="https://github.com/chy3xyz/zweq" style="color:var(--primary);text-decoration:none;">chy3xyz/zweq</a> · 业务参照禅道开源版<br>
+    v0.2 · 2026-09-20 · 面向一人公司 · 微信小程序优先
+  </footer>
+
+</div>
+</body>
+</html>

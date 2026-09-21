@@ -1,0 +1,418 @@
+//! Admin-facing cloud API — licenses (授权码) + marketplace (应用市场).
+
+const std = @import("std");
+const zigmodu = @import("zigmodu");
+const http = zigmodu.http;
+const mw = @import("../../middleware/auth.zig");
+const user_svc = @import("../user/service.zig");
+const audit_svc = @import("../audit/service.zig");
+
+const service = @import("service.zig");
+
+const LicenseDto = struct {
+    id: i64,
+    license_key: []const u8,
+    status: []const u8,
+    expires_at: i64,
+    created_at: i64,
+};
+
+fn toLicenseDto(row: service.LicenseRow) LicenseDto {
+    return .{
+        .id = row.id,
+        .license_key = row.license_key,
+        .status = row.status,
+        .expires_at = row.expires_at,
+        .created_at = row.created_at,
+    };
+}
+
+const MarketDto = struct {
+    id: i64,
+    name: []const u8,
+    title: []const u8,
+    version: []const u8,
+    description: []const u8,
+    download_url: []const u8,
+    updated_at: i64,
+};
+
+fn toMarketDto(row: service.MarketPackageRow) MarketDto {
+    return .{
+        .id = row.id,
+        .name = row.name,
+        .title = row.title,
+        .version = row.version,
+        .description = row.description,
+        .download_url = row.download_url,
+        .updated_at = row.updated_at,
+    };
+}
+
+const GenerateLicenseReq = struct {
+    days: i64,
+};
+
+const VerifyLicenseReq = struct {
+    key: []const u8,
+};
+
+const PublishPackageReq = struct {
+    name: []const u8,
+    title: []const u8,
+    version: []const u8,
+    description: []const u8,
+    download_url: []const u8,
+    checksum: []const u8 = "",
+};
+
+const InstallPackageReq = struct {
+    account_id: i64,
+};
+
+const RemoteVerifyReq = struct {
+    key: []const u8,
+};
+
+const DynamicTableDto = struct {
+    id: i64,
+    module: []const u8,
+    table_name: []const u8,
+    title: []const u8,
+    columns_json: []const u8,
+};
+
+pub fn CloudApi(comptime Service: type, comptime UserService: type) type {
+    return struct {
+        const Self = @This();
+        svc: *Service,
+        user_svc: *UserService,
+        audit: *audit_svc.AuditService,
+        default_tenant_id: i64,
+
+        pub const module_name = "cloud";
+        pub const nest: []const []const u8 = &.{};
+        pub const State = Self;
+
+        pub const routes: []const http.RouteSpec(Self) = &.{
+            .{ .method = .POST, .path = "cloud/licenses", .handler = http.wrapHandler(Self, generateLicense), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .GET, .path = "cloud/licenses", .handler = http.wrapHandler(Self, listLicenses), .meta = .{ .permission = "cloud:read" } },
+            .{ .method = .POST, .path = "cloud/licenses/{id}/revoke", .handler = http.wrapHandler(Self, revokeLicense), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .POST, .path = "cloud/licenses/verify", .handler = http.wrapHandler(Self, verifyLicense), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .GET, .path = "cloud/market", .handler = http.wrapHandler(Self, listMarket), .meta = .{ .permission = "cloud:read" } },
+            .{ .method = .POST, .path = "cloud/market", .handler = http.wrapHandler(Self, publishPackage), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .POST, .path = "cloud/market/{name}/install", .handler = http.wrapHandler(Self, installPackage), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .POST, .path = "cloud/remote/verify", .handler = http.wrapHandler(Self, remoteVerify), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .POST, .path = "cloud/remote/sync-market", .handler = http.wrapHandler(Self, remoteSyncMarket), .meta = .{ .permission = "cloud:write" } },
+            .{ .method = .GET, .path = "cloud/tables", .handler = http.wrapHandler(Self, listDynamicTables), .meta = .{ .permission = "cloud:read" } },
+            .{ .method = .GET, .path = "cloud/tables/{table}/rows", .handler = http.wrapHandler(Self, queryDynamicTable), .meta = .{ .permission = "cloud:read" } },
+        };
+
+        pub fn init(svc: *Service, users: *UserService, audit: *audit_svc.AuditService, default_tenant_id: i64) Self {
+            return .{ .svc = svc, .user_svc = users, .audit = audit, .default_tenant_id = default_tenant_id };
+        }
+
+        pub fn registerRoutes(self: *Self, group: *http.RouteGroup) !void {
+            var g = try group.use(zigmodu.http.http_middleware.jwtAuthWithSecurity(&self.user_svc.sec.module));
+            g = try g.use(mw.tokenVersionGuard(self.user_svc.sec, self.user_svc.store));
+            try g.post("/cloud/licenses", generateLicense, @ptrCast(@alignCast(self)));
+            try g.get("/cloud/licenses", listLicenses, @ptrCast(@alignCast(self)));
+            try g.post("/cloud/licenses/{id}/revoke", revokeLicense, @ptrCast(@alignCast(self)));
+            try g.post("/cloud/licenses/verify", verifyLicense, @ptrCast(@alignCast(self)));
+            try g.get("/cloud/market", listMarket, @ptrCast(@alignCast(self)));
+            try g.post("/cloud/market", publishPackage, @ptrCast(@alignCast(self)));
+            try g.post("/cloud/market/{name}/install", installPackage, @ptrCast(@alignCast(self)));
+            // 远端云服务（ztao-cloud）对接。
+            try g.post("/cloud/remote/verify", remoteVerify, @ptrCast(@alignCast(self)));
+            try g.post("/cloud/remote/sync-market", remoteSyncMarket, @ptrCast(@alignCast(self)));
+            // 动态表运行时访问（manifest 声明的表）。
+            try g.get("/cloud/tables", listDynamicTables, @ptrCast(@alignCast(self)));
+            try g.get("/cloud/tables/{table}/rows", queryDynamicTable, @ptrCast(@alignCast(self)));
+        }
+
+        /// Sets the `audit_actor` context attribute from the authenticated user.
+        fn setAuditActor(ctx: *http.Context, self: *Self) !void {
+            const uid = ctx.userIdInt(i64) orelse return;
+            const row_opt = self.user_svc.getUserById(uid) catch return;
+            const row = row_opt orelse return;
+            defer row.free(self.user_svc.store.allocator);
+            try ctx.setAttr("audit_actor", row.name);
+        }
+
+        fn tenantScope(ctx: *http.Context, self: *Self) i64 {
+            return mw.authTenantId(ctx) orelse self.default_tenant_id;
+        }
+
+        fn generateLicense(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+
+            const req = ctx.bindJson(GenerateLicenseReq) catch {
+                try ctx.sendErrorResponse(400, 400, "请求体格式错误");
+                return;
+            };
+            const row = self.svc.generateLicense(ctx.allocator, tid, req.days) catch |err| {
+                const msg = switch (err) {
+                    error.InvalidDays => "授权天数必须大于 0",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            defer row.free(self.svc.allocator);
+            var d1: [160]u8 = undefined;
+            const det1 = try std.fmt.bufPrint(&d1, "生成授权码 {s} ({d}天)", .{ row.license_key, req.days });
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "cloud.license.issue", "cloud", row.id, det1, zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.okValue(toLicenseDto(row));
+        }
+
+        fn listLicenses(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const tid = tenantScope(ctx, self);
+
+            const params = zigmodu.http.PageParams.parse(ctx, .{ .max_page_size = 100 });
+            var result = self.svc.listLicenses(params.page, params.page_size, tid) catch {
+                try ctx.sendErrorResponse(500, 500, "服务器错误");
+                return;
+            };
+            defer result.free(self.svc.allocator);
+            const dtos = try zigmodu.http.Extract.toDtoList(ctx.allocator, result.items, LicenseDto, toLicenseDto);
+            try zigmodu.http.sendPaged(ctx, dtos, @intCast(result.total), params, .ruoyi);
+        }
+
+        fn revokeLicense(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+
+            const id = ctx.paramInt(i64, "id") catch {
+                try ctx.sendErrorResponse(400, 400, "无效的授权码 ID");
+                return;
+            };
+            self.svc.revokeLicense(id) catch {
+                try ctx.sendErrorResponse(500, 500, "服务器错误");
+                return;
+            };
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "cloud.license.revoke", "cloud", id, "撤销授权码", zigmodu.http.RequestUtil.getRealIp(ctx), true, tenantScope(ctx, self));
+            try ctx.ok("null");
+        }
+
+        fn verifyLicense(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const tid = tenantScope(ctx, self);
+
+            const req = ctx.bindJson(VerifyLicenseReq) catch {
+                try ctx.sendErrorResponse(400, 400, "请求体格式错误");
+                return;
+            };
+            defer ctx.allocator.free(req.key);
+            const valid = self.svc.verifyLicense(tid, req.key) catch |err| {
+                const reason = switch (err) {
+                    error.InvalidLicense => "invalid",
+                    error.LicenseExpired => "expired",
+                    else => "error",
+                };
+                try ctx.okValue(.{ .valid = false, .reason = reason });
+                return;
+            };
+            try ctx.okValue(.{ .valid = valid, .reason = "ok" });
+        }
+
+        fn listMarket(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const tid = tenantScope(ctx, self);
+
+            const params = zigmodu.http.PageParams.parse(ctx, .{ .max_page_size = 100 });
+            var result = self.svc.listMarket(params.page, params.page_size, tid) catch {
+                try ctx.sendErrorResponse(500, 500, "服务器错误");
+                return;
+            };
+            defer result.free(self.svc.allocator);
+            const dtos = try zigmodu.http.Extract.toDtoList(ctx.allocator, result.items, MarketDto, toMarketDto);
+            try zigmodu.http.sendPaged(ctx, dtos, @intCast(result.total), params, .ruoyi);
+        }
+
+        fn publishPackage(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+
+            const req = ctx.bindJson(PublishPackageReq) catch {
+                try ctx.sendErrorResponse(400, 400, "请求体格式错误");
+                return;
+            };
+            defer {
+                ctx.allocator.free(req.name);
+                ctx.allocator.free(req.title);
+                ctx.allocator.free(req.version);
+                ctx.allocator.free(req.description);
+                ctx.allocator.free(req.download_url);
+                if (req.checksum.len > 0) ctx.allocator.free(req.checksum);
+            }
+            const id = self.svc.publishPackage(tid, req.name, req.title, req.version, req.description, req.download_url, req.checksum) catch |err| {
+                const msg = switch (err) {
+                    error.InvalidName => "包名不能为空",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            var d1: [128]u8 = undefined;
+            const det1 = try std.fmt.bufPrint(&d1, "发布市场包 {s} v{s}", .{ req.name, req.version });
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "cloud.market.publish", "cloud", id, det1, zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.okValue(.{ .id = id });
+        }
+
+        fn installPackage(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+
+            const name = ctx.pathParam("name") orelse {
+                try ctx.sendErrorResponse(400, 400, "缺少包名");
+                return;
+            };
+            const req = ctx.bindJson(InstallPackageReq) catch {
+                try ctx.sendErrorResponse(400, 400, "请求体格式错误");
+                return;
+            };
+            const module_id = self.svc.installPackage(tid, name, req.account_id) catch |err| {
+                const msg = switch (err) {
+                    error.InvalidName => "包名不能为空",
+                    error.NotFound => "市场包不存在",
+                    error.ChecksumMismatch => "产物校验失败（sha256 不匹配）",
+                    error.DownloadFailed => "产物下载失败",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            var d1: [128]u8 = undefined;
+            const det1 = try std.fmt.bufPrint(&d1, "安装市场包 {s} → 模块 #{d}", .{ name, module_id });
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "cloud.market.install", "cloud", module_id, det1, zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.okValue(.{ .module_id = module_id });
+        }
+
+        fn remoteVerify(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+
+            const req = ctx.bindJson(RemoteVerifyReq) catch {
+                try ctx.sendErrorResponse(400, 400, "请求体格式错误");
+                return;
+            };
+            defer ctx.allocator.free(req.key);
+            if (!self.svc.isRemote()) {
+                try ctx.sendErrorResponse(400, 400, "未配置远端云服务（ZTAO_CLOUD_REMOTE_URL）");
+                return;
+            }
+            const valid = self.svc.verifyLicenseRemote(ctx.allocator, req.key) catch |err| {
+                const reason = switch (err) {
+                    error.InvalidLicense => "invalid",
+                    error.LicenseExpired => "expired",
+                    error.RemoteUnavailable => "remote_unavailable",
+                    else => "error",
+                };
+                try ctx.okValue(.{ .valid = false, .reason = reason });
+                return;
+            };
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "cloud.remote.verify", "cloud", 0, "远端校验授权码", zigmodu.http.RequestUtil.getRealIp(ctx), true, tenantScope(ctx, self));
+            try ctx.okValue(.{ .valid = valid, .reason = "ok" });
+        }
+
+        fn remoteSyncMarket(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+
+            if (!self.svc.isRemote()) {
+                try ctx.sendErrorResponse(400, 400, "未配置远端云服务（ZTAO_CLOUD_REMOTE_URL）");
+                return;
+            }
+            const count = self.svc.syncMarketRemote(ctx.allocator, tid) catch |err| {
+                const msg = switch (err) {
+                    error.RemoteUnavailable => "远端云服务不可达",
+                    else => "远端云服务同步失败",
+                };
+                try ctx.sendErrorResponse(502, 502, msg);
+                return;
+            };
+            var d1: [96]u8 = undefined;
+            const det1 = try std.fmt.bufPrint(&d1, "同步云端市场 {d} 个包", .{count});
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "cloud.remote.sync", "cloud", 0, det1, zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.okValue(.{ .count = count });
+        }
+
+        fn listDynamicTables(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const tid = tenantScope(ctx, self);
+
+            const tables = self.svc.listDynamicTables(tid) catch {
+                try ctx.sendErrorResponse(500, 500, "服务器错误");
+                return;
+            };
+            defer {
+                for (tables) |t| t.free(self.svc.allocator);
+                self.svc.allocator.free(tables);
+            }
+            var dto_list = std.ArrayList(DynamicTableDto).empty;
+            defer dto_list.deinit(ctx.allocator);
+            for (tables) |t| {
+                dto_list.append(ctx.allocator, .{
+                    .id = t.id,
+                    .module = t.module,
+                    .table_name = t.table_name,
+                    .title = t.title,
+                    .columns_json = t.columns_json,
+                }) catch return error.UnexpectedError;
+            }
+            try ctx.okValue(dto_list.items);
+        }
+
+        fn queryDynamicTable(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const tid = tenantScope(ctx, self);
+            const table = ctx.pathParam("table") orelse {
+                try ctx.sendErrorResponse(400, 400, "缺少表名");
+                return;
+            };
+            const params = zigmodu.http.PageParams.parse(ctx, .{ .max_page_size = 100 });
+            var rows = self.svc.queryDynamicTable(ctx.allocator, tid, table, params.page, params.page_size) catch |err| {
+                const msg = switch (err) {
+                    error.NotFound => "动态表未注册",
+                    error.InvalidName => "非法表名",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            defer rows.free(ctx.allocator);
+
+            // 把 cells 重排成 rows[row][col] 二维结构，便于 jsonStruct 序列化。
+            var rows_2d = std.ArrayList([]const []const u8).empty;
+            defer rows_2d.deinit(ctx.allocator);
+            var i: usize = 0;
+            while (i < rows.row_count) : (i += 1) {
+                rows_2d.append(ctx.allocator, rows.cells[i * rows.column_count .. (i + 1) * rows.column_count]) catch return error.UnexpectedError;
+            }
+            try ctx.okValue(.{
+                .columns = rows.columns,
+                .rows = rows_2d.items,
+                .total = rows.row_count,
+            });
+        }
+    };
+}
+
+pub const DefaultCloudApi = CloudApi(service.CloudService, user_svc.UserService);

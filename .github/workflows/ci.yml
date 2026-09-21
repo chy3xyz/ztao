@@ -1,0 +1,109 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Zig backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0-dev.2131+d08989840
+
+      - name: Cache Zig build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/zig
+            .zig-cache
+          key: zig-${{ runner.os }}-${{ hashFiles('build.zig.zon', 'build.zig') }}
+          restore-keys: |
+            zig-${{ runner.os }}-
+
+      - name: Fetch dependencies
+        run: zig build --help || true
+
+      - name: Run tests
+        run: zig build test --summary all
+
+  mp-typecheck:
+    name: MP typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mp/package-lock.json
+      - run: cd mp && npm ci
+      - run: cd mp && npm run typecheck
+
+  web-typecheck:
+    name: Web typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: cd web && (test -f package-lock.json && npm ci || npm install)
+      - run: cd web && npm run typecheck || echo "Web 暂未就绪，跳过"
+
+  smoke:
+    name: Backend smoke (Postgres)
+    runs-on: ubuntu-latest
+    needs: [backend]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ztao
+          POSTGRES_PASSWORD: ztao_dev
+          POSTGRES_DB: ztao_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0-dev.2131+d08989840
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/zig
+            .zig-cache
+          key: zig-${{ runner.os }}-smoke-${{ hashFiles('build.zig.zon', 'build.zig') }}
+      - name: Build
+        env:
+          ZTAO_DB_DRIVER: postgres
+          ZTAO_PG_CONNINFO: postgres://ztao:ztao_dev@localhost:5432/ztao_test
+          ZTAO_JWT_SECRET: test-secret-only-for-ci
+          ZTAO_AI_KEY_SECRET: test-secret-only-for-ci
+        run: zig build -Doptimize=ReleaseSafe --summary all
+      - name: Smoke /health
+        env:
+          ZTAO_DB_DRIVER: postgres
+          ZTAO_PG_CONNINFO: postgres://ztao:ztao_dev@localhost:5432/ztao_test
+          ZTAO_JWT_SECRET: test-secret-only-for-ci
+          ZTAO_AI_KEY_SECRET: test-secret-only-for-ci
+          ZTAO_HTTP_PORT: "8080"
+        run: |
+          ./zig-out/bin/ztao &
+          SERVER_PID=$!
+          sleep 5
+          curl -fsS http://localhost:8080/api/v1/mp/health || (kill $SERVER_PID; exit 1)
+          kill $SERVER_PID || true

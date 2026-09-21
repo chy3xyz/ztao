@@ -1,0 +1,189 @@
+//! Admin-facing menu API — 公众号自定义菜单的保存/读取/发布/删除。
+
+const std = @import("std");
+const zigmodu = @import("zigmodu");
+const http = zigmodu.http;
+const mw = @import("../../middleware/auth.zig");
+const user_svc = @import("../user/service.zig");
+const audit_svc = @import("../audit/service.zig");
+
+const service = @import("service.zig");
+
+const SaveMenuReq = struct {
+    menu_json: []const u8,
+};
+
+pub fn MenuApi(comptime Service: type, comptime UserService: type) type {
+    return struct {
+        const Self = @This();
+        svc: *Service,
+        user_svc: *UserService,
+        audit: *audit_svc.AuditService,
+        default_tenant_id: i64,
+
+        pub const module_name = "menu";
+        pub const nest: []const []const u8 = &.{};
+        pub const State = Self;
+
+        pub const routes: []const http.RouteSpec(Self) = &.{
+            .{ .method = .GET, .path = "accounts/{id}/menu", .handler = http.wrapHandler(Self, get), .meta = .{ .permission = "menu:read" } },
+            .{ .method = .PUT, .path = "accounts/{id}/menu", .handler = http.wrapHandler(Self, save), .meta = .{ .permission = "menu:write" } },
+            .{ .method = .POST, .path = "accounts/{id}/menu/publish", .handler = http.wrapHandler(Self, publish), .meta = .{ .permission = "menu:write" } },
+            .{ .method = .GET, .path = "accounts/{id}/menu/fetch", .handler = http.wrapHandler(Self, fetchMenu), .meta = .{ .permission = "menu:read" } },
+            .{ .method = .DELETE, .path = "accounts/{id}/menu", .handler = http.wrapHandler(Self, deleteRemote), .meta = .{ .permission = "menu:write" } },
+        };
+
+        pub fn init(svc: *Service, users: *UserService, audit: *audit_svc.AuditService, default_tenant_id: i64) Self {
+            return .{ .svc = svc, .user_svc = users, .audit = audit, .default_tenant_id = default_tenant_id };
+        }
+
+        pub fn registerRoutes(self: *Self, group: *http.RouteGroup) !void {
+            var g = try group.use(zigmodu.http.http_middleware.jwtAuthWithSecurity(&self.user_svc.sec.module));
+            g = try g.use(mw.tokenVersionGuard(self.user_svc.sec, self.user_svc.store));
+            try g.get("/accounts/{id}/menu", get, @ptrCast(@alignCast(self)));
+            try g.put("/accounts/{id}/menu", save, @ptrCast(@alignCast(self)));
+            try g.post("/accounts/{id}/menu/publish", publish, @ptrCast(@alignCast(self)));
+            try g.get("/accounts/{id}/menu/fetch", fetchMenu, @ptrCast(@alignCast(self)));
+            try g.delete("/accounts/{id}/menu", deleteRemote, @ptrCast(@alignCast(self)));
+        }
+
+        fn setAuditActor(ctx: *http.Context, self: *Self) !void {
+            const uid = ctx.userIdInt(i64) orelse return;
+            const row_opt = self.user_svc.getUserById(uid) catch return;
+            const row = row_opt orelse return;
+            defer row.free(self.user_svc.store.allocator);
+            try ctx.setAttr("audit_actor", row.name);
+        }
+
+        fn tenantScope(ctx: *http.Context, self: *Self) i64 {
+            return mw.authTenantId(ctx) orelse self.default_tenant_id;
+        }
+
+        fn accountId(ctx: *http.Context) ?i64 {
+            return ctx.paramInt(i64, "id") catch null;
+        }
+
+        fn get(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const tid = tenantScope(ctx, self);
+            const account_id = accountId(ctx) orelse {
+                try ctx.sendErrorResponse(400, 400, "无效的账号 ID");
+                return;
+            };
+
+            const row_opt = self.svc.get(tid, account_id) catch {
+                try ctx.sendErrorResponse(500, 500, "服务器错误");
+                return;
+            };
+            const row = row_opt orelse {
+                try ctx.okValue(.{ .menu_json = "" });
+                return;
+            };
+            defer row.free(self.svc.allocator);
+            try ctx.okValue(.{ .menu_json = row.menu_json });
+        }
+
+        fn save(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+            const account_id = accountId(ctx) orelse {
+                try ctx.sendErrorResponse(400, 400, "无效的账号 ID");
+                return;
+            };
+
+            const req = ctx.bindJson(SaveMenuReq) catch {
+                try ctx.sendErrorResponse(400, 400, "请求体格式错误");
+                return;
+            };
+            defer ctx.allocator.free(req.menu_json);
+            const id = self.svc.save(tid, account_id, req.menu_json) catch |err| {
+                const msg = switch (err) {
+                    error.InvalidJson => "菜单 JSON 格式错误",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            var d1: [96]u8 = undefined;
+            const det1 = try std.fmt.bufPrint(&d1, "账号 #{d} 保存菜单", .{account_id});
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "menu.save", "menu", id, det1, zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.okValue(.{ .id = id });
+        }
+
+        fn publish(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+            const account_id = accountId(ctx) orelse {
+                try ctx.sendErrorResponse(400, 400, "无效的账号 ID");
+                return;
+            };
+
+            self.svc.publish(tid, account_id) catch |err| {
+                const msg = switch (err) {
+                    error.AccountNotFound => "账号不存在",
+                    error.MenuNotConfigured => "尚未保存菜单",
+                    error.WechatApiError => "微信接口调用失败",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            var d1: [96]u8 = undefined;
+            const det1 = try std.fmt.bufPrint(&d1, "账号 #{d} 发布菜单", .{account_id});
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "menu.publish", "menu", account_id, det1, zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.ok("null");
+        }
+
+        fn deleteRemote(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const admin_id = ctx.userIdInt(i64) orelse return;
+            const tid = tenantScope(ctx, self);
+            const account_id = accountId(ctx) orelse {
+                try ctx.sendErrorResponse(400, 400, "无效的账号 ID");
+                return;
+            };
+
+            self.svc.deleteRemote(account_id) catch |err| {
+                const msg = switch (err) {
+                    error.AccountNotFound => "账号不存在",
+                    error.WechatApiError => "微信接口调用失败",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            self.audit.log(admin_id, ctx.getAttr("audit_actor") orelse "", "menu.delete", "menu", account_id, "删除微信菜单", zigmodu.http.RequestUtil.getRealIp(ctx), true, tid);
+            try ctx.ok("null");
+        }
+
+        fn fetchMenu(ctx: *http.Context) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx.user_data orelse return error.UnexpectedError));
+            try setAuditActor(ctx, self);
+            const account_id = accountId(ctx) orelse {
+                try ctx.sendErrorResponse(400, 400, "无效的账号 ID");
+                return;
+            };
+            const data = self.svc.fetchMenu(account_id) catch |err| {
+                const msg = switch (err) {
+                    error.AccountNotFound => "账号不存在",
+                    error.WechatApiError => "微信接口调用失败",
+                    else => "操作失败",
+                };
+                try ctx.sendErrorResponse(400, 400, msg);
+                return;
+            };
+            // `fetchMenu` 用 service 分配器 dupe（进程 gpa），`ctx.allocator` 是连接
+            // arena（free 是 no-op）→ 用拥有者释放。
+            defer self.svc.allocator.free(data);
+            try ctx.okValue(.{ .menu_json = data });
+        }
+    };
+}
+
+pub const DefaultMenuApi = MenuApi(service.MenuService, user_svc.UserService);

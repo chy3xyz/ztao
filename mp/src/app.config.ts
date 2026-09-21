@@ -1,0 +1,43 @@
+/** eslint-disable */
+export default {
+  pages: [
+    'pages/auth/login/index',
+    'pages/onboarding/first/index',
+    'pages/workspace/index/index',
+    'pages/project/index/index',
+    'pages/project/new/index',
+    'pages/project/board/index',
+    'pages/task/new/index',
+    'pages/task/id/index',
+    'pages/mall/index/index',
+    'pages/mall/gift/index',
+    'pages/mall/accessory/index',
+    'pages/mall/compute/index',
+    'pages/mall/orders/index',
+    'pages/me/index/index',
+    'pages/ai/chat/index',
+    'pages/agent/detail/index',
+  ],
+  window: {
+    backgroundTextStyle: 'light',
+    navigationBarBackgroundColor: '#ffffff',
+    navigationBarTitleText: 'ztao',
+    navigationBarTextStyle: 'black',
+    backgroundColor: '#fafafa',
+  },
+  tabBar: {
+    color: '#7c7a72',
+    selectedColor: '#2f6f5e',
+    backgroundColor: '#ffffff',
+    borderStyle: 'white',
+    list: [
+      { pagePath: 'pages/workspace/index/index', text: '工作台' },
+      { pagePath: 'pages/project/index/index',   text: '项目' },
+      { pagePath: 'pages/mall/index/index',      text: '商城' },
+      { pagePath: 'pages/me/index/index',        text: '我的' },
+    ],
+  },
+  requiredPrivateInfos: ['chooseLocation'],
+  permission: {},
+  sitemapLocation: 'sitemap.json',
+} as const;

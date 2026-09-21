@@ -1,0 +1,95 @@
+const std = @import("std");
+const db_link = @import("db_link.zig");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    // Link SQLite + Postgres + MySQL drivers (drivers discovered by db_link/dependency build).
+    const features = db_link.Features.all;
+
+    const zigmodu_dep = b.dependency("zigmodu", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zent_dep = b.dependency("zent", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zwechat_dep = b.dependency("zwechat", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const exe_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    exe_mod.addImport("zigmodu", zigmodu_dep.module("zigmodu"));
+    exe_mod.addImport("zent", zent_dep.module("zent"));
+    exe_mod.addImport("zwechat", zwechat_dep.module("zwechat"));
+    db_link.link(exe_mod, b, features);
+
+    const exe = b.addExecutable(.{ .name = "ztao", .root_module = exe_mod });
+    b.installArtifact(exe);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+    const run_step = b.step("run", "Run the ztao server");
+    run_step.dependOn(&run_cmd.step);
+
+    // Admin CLI (create/list administrator accounts)
+    const admin_mod = b.createModule(.{
+        .root_source_file = b.path("src/admin_cli.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    admin_mod.addImport("zigmodu", zigmodu_dep.module("zigmodu"));
+    admin_mod.addImport("zent", zent_dep.module("zent"));
+    admin_mod.addImport("zwechat", zwechat_dep.module("zwechat"));
+    db_link.link(admin_mod, b, features);
+
+    const admin_exe = b.addExecutable(.{ .name = "ztao-admin", .root_module = admin_mod });
+    b.installArtifact(admin_exe);
+
+    const admin_cmd = b.addRunArtifact(admin_exe);
+    admin_cmd.step.dependOn(b.getInstallStep());
+    const admin_step = b.step("admin", "Admin CLI help; run zig-out/bin/ztao-admin create-admin --email you@example.com");
+    admin_step.dependOn(&admin_cmd.step);
+
+    // Unit tests
+    const tests_mod = b.createModule(.{
+        .root_source_file = b.path("src/tests.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    tests_mod.addImport("zigmodu", zigmodu_dep.module("zigmodu"));
+    tests_mod.addImport("zent", zent_dep.module("zent"));
+    tests_mod.addImport("zwechat", zwechat_dep.module("zwechat"));
+    db_link.link(tests_mod, b, features);
+
+    const tests = b.addTest(.{ .root_module = tests_mod });
+    const run_tests = b.addRunArtifact(tests);
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_tests.step);
+
+    // 体积门禁：任一 src/**/*.zig 超过行数预算即失败（防巨型单体回潮）。
+    const size_check = b.addSystemCommand(&.{ "/bin/sh", "scripts/check_file_size.sh" });
+    const lint_size = b.step("lint-size", "Fail if any src/**/*.zig exceeds the line budget");
+    lint_size.dependOn(&size_check.step);
+
+    // 分配器归属门禁：拦“用请求 arena 释放长期分配器对象”（arena.free 是 no-op
+    // → 静默泄漏）。单元测试抓不到这一类（两侧同为 testing allocator），只能静态查。
+    const alloc_check = b.addSystemCommand(&.{ "python3", "scripts/check_alloc_owner.py", "src" });
+    const lint_alloc = b.step("lint-alloc", "Fail if an entity is freed with an allocator that does not own it");
+    lint_alloc.dependOn(&alloc_check.step);
+
+    // 格式门禁：任一 src/**/*.zig 不符合 zig fmt 即失败（提交前先 `zig fmt src`）。
+    const fmt_check = b.addSystemCommand(&.{ b.graph.zig_exe, "fmt", "--check", "src" });
+    const lint_fmt = b.step("lint-fmt", "Fail if any src/**/*.zig is not zig-fmt clean");
+    lint_fmt.dependOn(&fmt_check.step);
+}

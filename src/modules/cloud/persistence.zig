@@ -1,0 +1,370 @@
+//! Persistence over the zent Client — licenses + marketplace packages.
+
+const std = @import("std");
+const zent = @import("zent");
+const model = @import("model.zig");
+const schema = @import("../../schema.zig");
+
+const graph = zent.codegen.graph.buildGraph(&.{ model.License, model.MarketPackage, model.DynamicTable });
+pub const infos = graph.types;
+/// Shared, application-wide typed client (all schemas registered in schema.zig).
+pub const Client = schema.Client;
+pub const LicenseInfo = infos[0];
+pub const MarketPackageInfo = infos[1];
+pub const DynamicTableInfo = infos[2];
+
+pub const LicenseRow = struct {
+    id: i64,
+    tenant_id: i64,
+    license_key: []const u8,
+    status: []const u8,
+    expires_at: i64,
+    created_at: i64,
+    updated_at: i64,
+
+    pub fn free(self: LicenseRow, allocator: std.mem.Allocator) void {
+        allocator.free(self.license_key);
+        allocator.free(self.status);
+    }
+};
+
+pub const LicenseListResult = struct {
+    items: []LicenseRow,
+    total: i64,
+
+    pub fn free(self: *LicenseListResult, allocator: std.mem.Allocator) void {
+        for (self.items) |r| r.free(allocator);
+        allocator.free(self.items);
+    }
+};
+
+pub const MarketPackageRow = struct {
+    id: i64,
+    tenant_id: i64,
+    name: []const u8,
+    title: []const u8,
+    version: []const u8,
+    description: []const u8,
+    download_url: []const u8,
+    checksum: []const u8,
+    created_at: i64,
+    updated_at: i64,
+
+    pub fn free(self: MarketPackageRow, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        allocator.free(self.title);
+        allocator.free(self.version);
+        allocator.free(self.description);
+        allocator.free(self.download_url);
+        allocator.free(self.checksum);
+    }
+};
+
+pub const MarketListResult = struct {
+    items: []MarketPackageRow,
+    total: i64,
+
+    pub fn free(self: *MarketListResult, allocator: std.mem.Allocator) void {
+        for (self.items) |r| r.free(allocator);
+        allocator.free(self.items);
+    }
+};
+
+pub const CloudStore = struct {
+    allocator: std.mem.Allocator,
+    client: Client,
+
+    pub fn init(allocator: std.mem.Allocator, client: Client) CloudStore {
+        return .{ .allocator = allocator, .client = client };
+    }
+
+    fn dupLicense(self: *CloudStore, e: anytype) !LicenseRow {
+        const license_key = try self.allocator.dupe(u8, e.license_key);
+        errdefer self.allocator.free(license_key);
+        const status = try self.allocator.dupe(u8, e.status);
+        errdefer self.allocator.free(status);
+        return .{
+            .id = e.id,
+            .tenant_id = e.tenant_id,
+            .license_key = license_key,
+            .status = status,
+            .expires_at = e.expires_at,
+            .created_at = e.created_at orelse 0,
+            .updated_at = e.updated_at orelse 0,
+        };
+    }
+
+    fn dupPackage(self: *CloudStore, e: anytype) !MarketPackageRow {
+        const name = try self.allocator.dupe(u8, e.name);
+        errdefer self.allocator.free(name);
+        const title = try self.allocator.dupe(u8, e.title);
+        errdefer self.allocator.free(title);
+        const version = try self.allocator.dupe(u8, e.version);
+        errdefer self.allocator.free(version);
+        const description = try self.allocator.dupe(u8, e.description);
+        errdefer self.allocator.free(description);
+        const download_url = try self.allocator.dupe(u8, e.download_url);
+        errdefer self.allocator.free(download_url);
+        const checksum = try self.allocator.dupe(u8, e.checksum);
+        errdefer self.allocator.free(checksum);
+        return .{
+            .id = e.id,
+            .tenant_id = e.tenant_id,
+            .name = name,
+            .title = title,
+            .version = version,
+            .description = description,
+            .download_url = download_url,
+            .checksum = checksum,
+            .created_at = e.created_at orelse 0,
+            .updated_at = e.updated_at orelse 0,
+        };
+    }
+
+    // ── License ───────────────────────────────────────────────────
+
+    pub fn createLicense(self: *CloudStore, tenant_id: i64, license_key: []const u8, expires_at: i64, now: i64) !i64 {
+        var b = try self.client.license.Create();
+        defer b.deinit();
+        _ = try b.setFieldValue("tenant_id", tenant_id);
+        _ = try b.setFieldValue("license_key", license_key);
+        _ = try b.setFieldValue("status", "active");
+        _ = try b.setFieldValue("expires_at", expires_at);
+        _ = try b.setFieldValue("created_at", now);
+        _ = try b.setFieldValue("updated_at", now);
+        var row = try b.Save();
+        defer self.client.license.deinitRow(&row);
+        return row.id;
+    }
+
+    pub fn getLicenseByKey(self: *CloudStore, tenant_id: i64, license_key: []const u8) !?LicenseRow {
+        var q = self.client.license.Query();
+        defer q.deinit();
+        const preds = self.client.license.predicates;
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.Where(.{preds.license_keyEQ(.{ .string = license_key })});
+        _ = q.Limit(1);
+        const entity_opt = try q.First();
+        var entity = entity_opt orelse return null;
+        defer self.client.license.deinitRow(&entity);
+        return try self.dupLicense(entity);
+    }
+
+    pub fn getLicenseById(self: *CloudStore, id: i64) !?LicenseRow {
+        var q = self.client.license.Query();
+        defer q.deinit();
+        const preds = self.client.license.predicates;
+        _ = try q.Where(.{preds.idEQ(.{ .int = id })});
+        const entity_opt = try q.First();
+        var entity = entity_opt orelse return null;
+        defer self.client.license.deinitRow(&entity);
+        return try self.dupLicense(entity);
+    }
+
+    pub fn listLicenses(self: *CloudStore, page: usize, page_size: usize, tenant_id: i64) !LicenseListResult {
+        var q = self.client.license.Query();
+        defer q.deinit();
+        const preds = self.client.license.predicates;
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderDesc("id")});
+
+        var paged = try q.paged(page, page_size);
+        defer paged.deinit();
+
+        var out = try self.allocator.alloc(LicenseRow, paged.items.items.len);
+        var n: usize = 0;
+        errdefer {
+            for (out[0..n]) |r| r.free(self.allocator);
+            self.allocator.free(out);
+        }
+        for (paged.items.items) |e| {
+            out[n] = try self.dupLicense(e);
+            n += 1;
+        }
+        return .{ .items = out, .total = paged.total };
+    }
+
+    pub fn setLicenseStatus(self: *CloudStore, id: i64, status: []const u8, now: i64) !void {
+        const preds = self.client.license.predicates;
+        var upd = self.client.license.Update();
+        defer upd.deinit();
+        _ = try upd.set("status", .{ .string = status });
+        _ = try upd.setFieldValue("updated_at", now);
+        _ = try upd.Where(.{preds.idEQ(.{ .int = id })});
+        _ = try upd.Save();
+    }
+
+    // ── MarketPackage ─────────────────────────────────────────────
+
+    pub fn getPackageByName(self: *CloudStore, tenant_id: i64, name: []const u8) !?MarketPackageRow {
+        var q = self.client.market_package.Query();
+        defer q.deinit();
+        const preds = self.client.market_package.predicates;
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.Where(.{preds.nameEQ(.{ .string = name })});
+        _ = q.Limit(1);
+        const entity_opt = try q.First();
+        var entity = entity_opt orelse return null;
+        defer self.client.market_package.deinitRow(&entity);
+        return try self.dupPackage(entity);
+    }
+
+    /// Upsert a market package by (tenant_id, name). Returns the package id.
+    pub fn upsertPackage(self: *CloudStore, tenant_id: i64, name: []const u8, title: []const u8, version: []const u8, description: []const u8, download_url: []const u8, checksum: []const u8, now: i64) !i64 {
+        if (try self.getPackageByName(tenant_id, name)) |row| {
+            defer row.free(self.allocator);
+            const preds = self.client.market_package.predicates;
+            var upd = self.client.market_package.Update();
+            defer upd.deinit();
+            _ = try upd.set("title", .{ .string = title });
+            _ = try upd.set("version", .{ .string = version });
+            _ = try upd.set("description", .{ .string = description });
+            _ = try upd.set("download_url", .{ .string = download_url });
+            _ = try upd.set("checksum", .{ .string = checksum });
+            _ = try upd.setFieldValue("updated_at", now);
+            _ = try upd.Where(.{preds.idEQ(.{ .int = row.id })});
+            _ = try upd.Save();
+            return row.id;
+        }
+        var b = try self.client.market_package.Create();
+        defer b.deinit();
+        _ = try b.setFieldValue("tenant_id", tenant_id);
+        _ = try b.setFieldValue("name", name);
+        _ = try b.setFieldValue("title", title);
+        _ = try b.setFieldValue("version", version);
+        _ = try b.setFieldValue("description", description);
+        _ = try b.setFieldValue("download_url", download_url);
+        _ = try b.setFieldValue("checksum", checksum);
+        _ = try b.setFieldValue("created_at", now);
+        _ = try b.setFieldValue("updated_at", now);
+        var row = try b.Save();
+        defer self.client.market_package.deinitRow(&row);
+        return row.id;
+    }
+
+    pub fn listMarket(self: *CloudStore, page: usize, page_size: usize, tenant_id: i64) !MarketListResult {
+        var q = self.client.market_package.Query();
+        defer q.deinit();
+        const preds = self.client.market_package.predicates;
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderAsc("name")});
+
+        var paged = try q.paged(page, page_size);
+        defer paged.deinit();
+
+        var out = try self.allocator.alloc(MarketPackageRow, paged.items.items.len);
+        var n: usize = 0;
+        errdefer {
+            for (out[0..n]) |r| r.free(self.allocator);
+            self.allocator.free(out);
+        }
+        for (paged.items.items) |e| {
+            out[n] = try self.dupPackage(e);
+            n += 1;
+        }
+        return .{ .items = out, .total = paged.total };
+    }
+};
+
+/// 动态表元数据存储（market manifest 声明的运行时表）。
+pub const DynamicTableStore = struct {
+    allocator: std.mem.Allocator,
+    client: Client,
+
+    pub fn init(allocator: std.mem.Allocator, client: Client) DynamicTableStore {
+        return .{ .allocator = allocator, .client = client };
+    }
+
+    pub const DynamicTableRow = struct {
+        id: i64,
+        module: []const u8,
+        table_name: []const u8,
+        title: []const u8,
+        columns_json: []const u8,
+
+        pub fn free(self: DynamicTableRow, allocator: std.mem.Allocator) void {
+            allocator.free(self.module);
+            allocator.free(self.table_name);
+            allocator.free(self.title);
+            allocator.free(self.columns_json);
+        }
+    };
+
+    fn dup(self: *DynamicTableStore, e: anytype) !DynamicTableRow {
+        const module = try self.allocator.dupe(u8, e.module);
+        errdefer self.allocator.free(module);
+        const table_name = try self.allocator.dupe(u8, e.table_name);
+        errdefer self.allocator.free(table_name);
+        const title = try self.allocator.dupe(u8, e.title);
+        errdefer self.allocator.free(title);
+        const columns_json = try self.allocator.dupe(u8, e.columns_json);
+        errdefer self.allocator.free(columns_json);
+        return .{ .id = e.id, .module = module, .table_name = table_name, .title = title, .columns_json = columns_json };
+    }
+
+    pub fn register(self: *DynamicTableStore, tenant_id: i64, module: []const u8, table_name: []const u8, title: []const u8, columns_json: []const u8, now: i64) !i64 {
+        const preds = self.client.dynamic_table.predicates;
+        var q = self.client.dynamic_table.Query();
+        defer q.deinit();
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.Where(.{preds.table_nameEQ(.{ .string = table_name })});
+        _ = q.Limit(1);
+        if (try q.First()) |e_const| {
+            var e = e_const;
+            defer self.client.dynamic_table.deinitRow(&e);
+            var upd = self.client.dynamic_table.Update();
+            defer upd.deinit();
+            _ = try upd.set("module", .{ .string = module });
+            _ = try upd.set("title", .{ .string = title });
+            _ = try upd.set("columns_json", .{ .string = columns_json });
+            _ = try upd.setFieldValue("updated_at", now);
+            _ = try upd.Where(.{preds.idEQ(.{ .int = e.id })});
+            _ = try upd.Save();
+            return e.id;
+        }
+        var b = try self.client.dynamic_table.Create();
+        defer b.deinit();
+        _ = try b.setFieldValue("tenant_id", tenant_id);
+        _ = try b.setFieldValue("module", module);
+        _ = try b.setFieldValue("table_name", table_name);
+        _ = try b.setFieldValue("title", title);
+        _ = try b.setFieldValue("columns_json", columns_json);
+        _ = try b.setFieldValue("created_at", now);
+        _ = try b.setFieldValue("updated_at", now);
+        var row = try b.Save();
+        defer self.client.dynamic_table.deinitRow(&row);
+        return row.id;
+    }
+
+    pub fn list(self: *DynamicTableStore, tenant_id: i64) ![]DynamicTableRow {
+        var q = self.client.dynamic_table.Query();
+        defer q.deinit();
+        const preds = self.client.dynamic_table.predicates;
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderAsc("table_name")});
+        var rows = try q.All();
+        defer self.client.dynamic_table.deinitRows(&rows);
+        var out = try self.allocator.alloc(DynamicTableRow, rows.items.len);
+        errdefer self.allocator.free(out);
+        var n: usize = 0;
+        errdefer for (out[0..n]) |r| r.free(self.allocator);
+        for (rows.items) |e| {
+            out[n] = try self.dup(e);
+            n += 1;
+        }
+        return out;
+    }
+
+    pub fn getByTable(self: *DynamicTableStore, tenant_id: i64, table_name: []const u8) !?DynamicTableRow {
+        const preds = self.client.dynamic_table.predicates;
+        var q = self.client.dynamic_table.Query();
+        defer q.deinit();
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.Where(.{preds.table_nameEQ(.{ .string = table_name })});
+        _ = q.Limit(1);
+        const e_opt = try q.First();
+        var e = e_opt orelse return null;
+        defer self.client.dynamic_table.deinitRow(&e);
+        return try self.dup(e);
+    }
+};
