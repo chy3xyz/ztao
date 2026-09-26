@@ -24,7 +24,7 @@ pub const PmsTaskService = struct {
         return zigmodu.time.wallClockSeconds(self.io);
     }
 
-    pub fn create(self: *PmsTaskService, tenant_id: i64, project_id: i64, sprint_id: i64, story_id: i64, name: []const u8, pri: i64, estimate: f32, assigned_to: i64, assignee_kind: []const u8, ai_assisted: bool) PmsTaskError!i64 {
+    pub fn create(self: *PmsTaskService, tenant_id: i64, project_id: i64, sprint_id: i64, story_id: i64, name: []const u8, pri: i64, estimate: f64, assigned_to: i64, assignee_kind: []const u8, ai_assisted: bool) PmsTaskError!i64 {
         const trimmed = std.mem.trim(u8, name, " \t");
         if (trimmed.len == 0) return error.InvalidName;
         return self.store.create(.{
@@ -58,7 +58,7 @@ pub const PmsTaskService = struct {
         return self.store.updateStatus(tenant_id, id, status, finished_by, self.now()) catch error.Unexpected;
     }
 
-    pub fn logTime(self: *PmsTaskService, tenant_id: i64, id: i64, hours: f32) PmsTaskError!bool {
+    pub fn logTime(self: *PmsTaskService, tenant_id: i64, id: i64, hours: f64) PmsTaskError!bool {
         if (hours < 0) return error.InvalidStatus;
         return self.store.logTime(tenant_id, id, hours, self.now()) catch error.Unexpected;
     }

@@ -32,7 +32,7 @@ pub const SprintListResult = struct {
     items: []SprintRow,
     total: i64,
 
-    pub fn free(self: *SprintListResult, allocator: std.mem.Allocator) void {
+    pub fn free(self: *const SprintListResult, allocator: std.mem.Allocator) void {
         for (self.items) |r| r.free(allocator);
         allocator.free(self.items);
     }
@@ -78,7 +78,7 @@ pub const SprintStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.sprint.deinitRow(&created);
+        defer self.client.sprint.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -90,18 +90,18 @@ pub const SprintStore = struct {
         _ = try q.Where(.{preds.project_idEQ(.{ .int = project_id })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderDesc("id")});
         var rows = try q.All();
-        defer rows.deinit();
-        var out = try self.allocator.alloc(SprintRow, rows.items.items.len);
+        defer self.client.sprint.deinitRows(&rows);
+        var out = try self.allocator.alloc(SprintRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dup(e);
             n += 1;
         }
-        return .{ .items = out, .total = @intCast(rows.items.items.len) };
+        return .{ .items = out, .total = @intCast(rows.items.len) };
     }
 
     pub fn getById(self: *SprintStore, tenant_id: i64, id: i64) !?SprintRow {
@@ -110,7 +110,7 @@ pub const SprintStore = struct {
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.sprint.deinitRow(&e);
+        defer self.client.sprint.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 };

@@ -128,7 +128,7 @@ pub const ComputeStore = struct {
     }, now: i64) !i64 {
         const preds = self.client.compute_package.predicates;
         if ((try crud.first(self.client.compute_package, .{preds.codeEQ(.{ .string = p.code })}))) |existing| {
-            defer self.client.compute_package.deinitRow(&existing);
+            defer self.client.compute_package.deinitRow(@constCast(&existing));
             _ = try crud.update(self.client.compute_package, .{
                 .name = p.name,
                 .description = p.description,
@@ -159,7 +159,7 @@ pub const ComputeStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.compute_package.deinitRow(&created);
+        defer self.client.compute_package.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -170,14 +170,14 @@ pub const ComputeStore = struct {
         _ = try q.Where(.{preds.activeEQ(.{ .bool = true })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderAsc("sort")});
         var rows = try q.All();
-        defer rows.deinit();
-        var out = try self.allocator.alloc(ComputePackageRow, rows.items.items.len);
+        defer self.client.compute_package.deinitRows(&rows);
+        var out = try self.allocator.alloc(ComputePackageRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dupPackage(e);
             n += 1;
         }
@@ -187,14 +187,14 @@ pub const ComputeStore = struct {
     pub fn getPackageByCode(self: *ComputeStore, code: []const u8) !?ComputePackageRow {
         const preds = self.client.compute_package.predicates;
         var e = (try crud.first(self.client.compute_package, .{preds.codeEQ(.{ .string = code })})) orelse return null;
-        defer self.client.compute_package.deinitRow(&e);
+        defer self.client.compute_package.deinitRow(@constCast(&e));
         return try self.dupPackage(e);
     }
 
     pub fn getPackageById(self: *ComputeStore, id: i64) !?ComputePackageRow {
         const preds = self.client.compute_package.predicates;
         var e = (try crud.first(self.client.compute_package, .{preds.idEQ(.{ .int = id })})) orelse return null;
-        defer self.client.compute_package.deinitRow(&e);
+        defer self.client.compute_package.deinitRow(@constCast(&e));
         return try self.dupPackage(e);
     }
 
@@ -215,7 +215,7 @@ pub const ComputeStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.compute_order.deinitRow(&created);
+        defer self.client.compute_order.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -225,7 +225,7 @@ pub const ComputeStore = struct {
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.compute_order.deinitRow(&e);
+        defer self.client.compute_order.deinitRow(@constCast(&e));
         return try self.dupOrder(e);
     }
 
@@ -264,10 +264,10 @@ pub const ComputeStore = struct {
         _ = try q.Where(.{preds.user_idEQ(.{ .int = user_id })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderDesc("id")});
         var rows = try q.All();
-        defer rows.deinit();
+        defer self.client.compute_order.deinitRows(&rows);
         // 简单分页
         const start = if (page > 1) (page - 1) * page_size else 0;
-        const end = @min(start + page_size, rows.items.items.len);
+        const end = @min(start + page_size, rows.items.len);
         if (start >= end) return &.{};
         var out = try self.allocator.alloc(ComputeOrderRow, end - start);
         var n: usize = 0;
@@ -275,7 +275,7 @@ pub const ComputeStore = struct {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items[start..end]) |e| {
+        for (rows.items[start..end]) |e| {
             out[n] = try self.dupOrder(e);
             n += 1;
         }

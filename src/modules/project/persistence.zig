@@ -16,9 +16,9 @@ pub const ProjectRow = struct {
     product_id: i64,
     name: []const u8,
     code: []const u8,
-    type_: []const u8,
+    kind: []const u8,
     status: []const u8,
-    model: []const u8,
+    mdl: []const u8,
     parent_id: i64,
     begin: i64,
     end: i64,
@@ -31,9 +31,9 @@ pub const ProjectRow = struct {
     pub fn free(self: ProjectRow, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
         allocator.free(self.code);
-        allocator.free(self.type_);
+        allocator.free(self.kind);
         allocator.free(self.status);
-        allocator.free(self.model);
+        allocator.free(self.mdl);
     }
 };
 
@@ -41,7 +41,7 @@ pub const ProjectListResult = struct {
     items: []ProjectRow,
     total: i64,
 
-    pub fn free(self: *ProjectListResult, allocator: std.mem.Allocator) void {
+    pub fn free(self: *const ProjectListResult, allocator: std.mem.Allocator) void {
         for (self.items) |r| r.free(allocator);
         allocator.free(self.items);
     }
@@ -60,20 +60,20 @@ pub const ProjectStore = struct {
         errdefer self.allocator.free(name);
         const code = try self.allocator.dupe(u8, e.code);
         errdefer self.allocator.free(code);
-        const type_ = try self.allocator.dupe(u8, e.type_);
-        errdefer self.allocator.free(type_);
+        const knd = try self.allocator.dupe(u8, e.kind);
+        errdefer self.allocator.free(knd);
         const status = try self.allocator.dupe(u8, e.status);
         errdefer self.allocator.free(status);
-        const model = try self.allocator.dupe(u8, e.model);
+        const mdl = try self.allocator.dupe(u8, e.mdl);
         return .{
             .id = e.id,
             .tenant_id = e.tenant_id,
             .product_id = e.product_id,
             .name = name,
             .code = code,
-            .type_ = type_,
+            .kind = knd,
             .status = status,
-            .model = model,
+            .mdl = mdl,
             .parent_id = e.parent_id,
             .begin = e.begin,
             .end = e.end,
@@ -90,7 +90,7 @@ pub const ProjectStore = struct {
         product_id: i64,
         name: []const u8,
         code: []const u8,
-        model: []const u8,
+        mdl: []const u8,
         owner_id: i64,
     }, now: i64) !i64 {
         var created = try crud.create(self.client.project, .{
@@ -98,9 +98,9 @@ pub const ProjectStore = struct {
             .product_id = p.product_id,
             .name = p.name,
             .code = p.code,
-            .type_ = "internal",
+            .kind = "internal",
             .status = "wait",
-            .model = p.model,
+            .mdl = p.mdl,
             .parent_id = 0,
             .begin = 0,
             .end = 0,
@@ -110,7 +110,7 @@ pub const ProjectStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.project.deinitRow(&created);
+        defer self.client.project.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -120,7 +120,7 @@ pub const ProjectStore = struct {
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.project.deinitRow(&e);
+        defer self.client.project.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 

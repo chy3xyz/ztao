@@ -55,7 +55,7 @@ fn toButton(allocator: std.mem.Allocator, dto: ButtonDto) !zwechat.officialaccou
     errdefer allocator.free(pagepath);
 
     var b = zwechat.officialaccount.menu.Button{
-        .type_ = type_,
+        .@"type" = type_,
         .name = name,
         .key = key,
         .url = url,

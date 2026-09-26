@@ -17,6 +17,7 @@ pub const UserIdentity = Schema("UserIdentity", .{
         field.String("unionid").Default(""),
         field.String("appid").Default(""),
         field.String("encrypted_session_key").Default("").Sensitive(),
+        field.Time("last_used_at").Optional(),
     },
     .indexes = &.{
         // 一个 (channel, appid, openid) 只对应一个 user

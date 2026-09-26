@@ -2,7 +2,7 @@ const zent = @import("zent");
 const field = zent.core.field;
 const Schema = zent.core.schema.Schema;
 
-pub const Task = Schema("Task", .{
+pub const Task = Schema("PmsTask", .{
     .fields = &.{
         field.Int("tenant_id").Default(1),
         field.Int("project_id").Default(0),
@@ -10,7 +10,7 @@ pub const Task = Schema("Task", .{
         field.Int("story_id").Default(0),
         field.Int("parent_id").Default(0),
         field.String("name"),
-        field.String("type").Default("task"),  // task | design | devel | test | study
+        field.String("kind").Default("task"),  // task | design | devel | test | study
         field.Int("pri").Default(3),
         field.Float("estimate").Default(0),       // 预估工时
         field.Float("consumed").Default(0),       // 已消耗

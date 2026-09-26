@@ -30,6 +30,12 @@ const onboarding_svc = @import("../onboarding/service.zig");
 const runtime_svc = @import("../../../services/agent_runtime.zig");
 const llm = @import("../../../services/llm.zig");
 
+fn unixNow() i64 {
+    var ts: std.c.timespec = .{ .tv_sec = 0, .tv_nsec = 0 };
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @intCast(ts.tv_sec);
+}
+
 const Self = @This();
 
 // ---------- DTOs ----------
@@ -230,11 +236,11 @@ pub fn MpApi(comptime UserService: type, comptime TenantService: type,
             const token = try ctx.allocator.alloc(u8, 36);
             defer ctx.allocator.free(token);
             const charset = "0123456789abcdefghijklmnopqrstuvwxyz";
-            var rng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
+            var rng = std.Random.DefaultPrng.init(unixNow());
             for (token) |*c| c.* = charset[rng.random().intRangeAtMost(usize, 0, charset.len - 1)];
             try ctx.okValue(.{
                 .qr_token = token,
-                .expires_at = std.time.timestamp() + 300,
+                .expires_at = unixNow() + 300,
                 .qr_url = "weixin://wxpay/bizpayurl?pr=ztao-stub",
             });
         }
@@ -297,7 +303,7 @@ pub fn MpApi(comptime UserService: type, comptime TenantService: type,
                 .balance = .{
                     .tokens = 50000,
                     .tokens_used_this_month = 0,
-                    .period_end = std.time.timestamp() + 30 * 86400,
+                    .period_end = unixNow() + 30 * 86400,
                 },
                 .agents = agent_dtos,
                 .onboarding = .{
@@ -516,7 +522,7 @@ pub fn MpApi(comptime UserService: type, comptime TenantService: type,
             const random_pw = try ctx.allocator.alloc(u8, 16);
             defer ctx.allocator.free(random_pw);
             const charset = "abcdefghijklmnopqrstuvwxyz0123456789";
-            var rng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
+            var rng = std.Random.DefaultPrng.init(unixNow());
             for (random_pw) |*c| c.* = charset[rng.random().intRangeAtMost(usize, 0, charset.len - 1)];
 
             const session = self.users.register(
@@ -564,7 +570,7 @@ pub fn MpApi(comptime UserService: type, comptime TenantService: type,
 
             return .{
                 .token = session.token,
-                .expires_at = std.time.timestamp() + 7 * 86400,
+                .expires_at = unixNow() + 7 * 86400,
                 .user = .{
                     .id = session.row.id,
                     .tenant_id = tenant_id,
@@ -611,7 +617,7 @@ pub fn MpApi(comptime UserService: type, comptime TenantService: type,
 
             return .{
                 .token = session.token,
-                .expires_at = std.time.timestamp() + 7 * 86400,
+                .expires_at = unixNow() + 7 * 86400,
                 .user = .{
                     .id = session.row.id,
                     .tenant_id = session.row.tenant_id,
@@ -660,7 +666,7 @@ pub fn MpApi(comptime UserService: type, comptime TenantService: type,
 
             return .{
                 .token = token,
-                .expires_at = std.time.timestamp() + 7 * 86400,
+                .expires_at = unixNow() + 7 * 86400,
                 .user = .{
                     .id = user_row.id,
                     .tenant_id = user_row.tenant_id,

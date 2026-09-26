@@ -36,7 +36,7 @@ pub const ApprovalListResult = struct {
     items: []AgentApprovalRow,
     total: i64,
 
-    pub fn free(self: *ApprovalListResult, allocator: std.mem.Allocator) void {
+    pub fn free(self: *const ApprovalListResult, allocator: std.mem.Allocator) void {
         for (self.items) |r| r.free(allocator);
         allocator.free(self.items);
     }
@@ -93,7 +93,7 @@ pub const ApprovalStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.agent_approval.deinitRow(&created);
+        defer self.client.agent_approval.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -105,19 +105,19 @@ pub const ApprovalStore = struct {
         _ = try q.Where(.{preds.decisionEQ(.{ .string = "pending" })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderDesc("requested_at")});
         var rows = try q.All();
-        defer rows.deinit();
+        defer self.client.agent_approval.deinitRows(&rows);
         _ = user_id; // M3 占位：所有 pending 都属于该 tenant 的 founder
-        var out = try self.allocator.alloc(AgentApprovalRow, rows.items.items.len);
+        var out = try self.allocator.alloc(AgentApprovalRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dup(e);
             n += 1;
         }
-        return .{ .items = out, .total = @intCast(rows.items.items.len) };
+        return .{ .items = out, .total = @intCast(rows.items.len) };
     }
 
     pub fn decide(self: *ApprovalStore, tenant_id: i64, id: i64, decision: []const u8, decided_by: i64, comment: []const u8, now: i64) !bool {

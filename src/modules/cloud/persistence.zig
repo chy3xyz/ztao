@@ -311,7 +311,7 @@ pub const DynamicTableStore = struct {
         _ = q.Limit(1);
         if (try q.First()) |e_const| {
             var e = e_const;
-            defer self.client.dynamic_table.deinitRow(&e);
+            defer self.client.dynamic_table.deinitRow(@constCast(&e));
             var upd = self.client.dynamic_table.Update();
             defer upd.deinit();
             _ = try upd.set("module", .{ .string = module });
@@ -364,7 +364,7 @@ pub const DynamicTableStore = struct {
         _ = q.Limit(1);
         const e_opt = try q.First();
         var e = e_opt orelse return null;
-        defer self.client.dynamic_table.deinitRow(&e);
+        defer self.client.dynamic_table.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 };

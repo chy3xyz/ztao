@@ -97,7 +97,7 @@ pub const BillingStore = struct {
     }, now: i64) !i64 {
         const preds = self.client.plan.predicates;
         if ((try crud.first(self.client.plan, .{preds.codeEQ(.{ .string = p.code })}))) |existing| {
-            defer self.client.plan.deinitRow(&existing);
+            defer self.client.plan.deinitRow(@constCast(&existing));
             _ = try crud.update(self.client.plan, .{
                 .name = p.name,
                 .monthly_price_cents = p.monthly_price_cents,
@@ -118,14 +118,14 @@ pub const BillingStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.plan.deinitRow(&created);
+        defer self.client.plan.deinitRow(@constCast(&created));
         return created.id;
     }
 
     pub fn getPlanByCode(self: *BillingStore, code: []const u8) !?PlanRow {
         const preds = self.client.plan.predicates;
         var e = (try crud.first(self.client.plan, .{preds.codeEQ(.{ .string = code })})) orelse return null;
-        defer self.client.plan.deinitRow(&e);
+        defer self.client.plan.deinitRow(@constCast(&e));
         return try self.dupPlan(e);
     }
 
@@ -136,7 +136,7 @@ pub const BillingStore = struct {
         if ((try crud.first(self.client.subscription, .{
             preds.tenant_idEQ(.{ .int = tenant_id }),
         }))) |existing| {
-            defer self.client.subscription.deinitRow(&existing);
+            defer self.client.subscription.deinitRow(@constCast(&existing));
             return existing.id;
         }
         const plan = (try self.getPlanByCode(plan_code)) orelse return error.PlanNotFound;
@@ -152,14 +152,14 @@ pub const BillingStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.subscription.deinitRow(&created);
+        defer self.client.subscription.deinitRow(@constCast(&created));
         return created.id;
     }
 
     pub fn getSubscription(self: *BillingStore, tenant_id: i64) !?SubscriptionRow {
         const preds = self.client.subscription.predicates;
         var e = (try crud.first(self.client.subscription, .{preds.tenant_idEQ(.{ .int = tenant_id })})) orelse return null;
-        defer self.client.subscription.deinitRow(&e);
+        defer self.client.subscription.deinitRow(@constCast(&e));
         return try self.dupSub(e);
     }
 };

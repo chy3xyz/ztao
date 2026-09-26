@@ -21,7 +21,7 @@ pub const StoryRow = struct {
     stage: []const u8,
     source: []const u8,
     category: []const u8,
-    estimate: f32,
+    estimate: f64,
     parent_id: i64,
     keywords: []const u8,
     assigned_to: i64,
@@ -46,7 +46,7 @@ pub const StoryListResult = struct {
     items: []StoryRow,
     total: i64,
 
-    pub fn free(self: *StoryListResult, allocator: std.mem.Allocator) void {
+    pub fn free(self: *const StoryListResult, allocator: std.mem.Allocator) void {
         for (self.items) |r| r.free(allocator);
         allocator.free(self.items);
     }
@@ -107,7 +107,7 @@ pub const StoryStore = struct {
         pri: i64,
         source: []const u8,
         category: []const u8,
-        estimate: f32,
+        estimate: f64,
         keywords: []const u8,
         assigned_to: i64,
         opened_by: i64,
@@ -134,7 +134,7 @@ pub const StoryStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.story.deinitRow(&created);
+        defer self.client.story.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -144,7 +144,7 @@ pub const StoryStore = struct {
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.story.deinitRow(&e);
+        defer self.client.story.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 

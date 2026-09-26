@@ -6,6 +6,7 @@ const persist = @import("persistence.zig");
 
 pub const ProductRow = persist.ProductRow;
 pub const ProductListResult = persist.ProductListResult;
+pub const ProductUpdateFields = persist.ProductUpdateFields;
 
 pub const ProductError = error{
     InvalidName,
@@ -43,13 +44,14 @@ pub const ProductService = struct {
         return self.store.listByTenant(tenant_id, page, page_size) catch error.Unexpected;
     }
 
-    pub fn update(self: *ProductService, tenant_id: i64, id: i64, fields: struct {
-        name: ?[]const u8 = null,
-        code: ?[]const u8 = null,
-        status: ?[]const u8 = null,
-        description: ?[]const u8 = null,
-        acl: ?[]const u8 = null,
-    }) ProductError!bool {
+    pub fn update(self: *ProductService, tenant_id: i64, id: i64, name: ?[]const u8, code: ?[]const u8, status: ?[]const u8, description: ?[]const u8, acl: ?[]const u8) ProductError!bool {
+        const fields = persist.ProductUpdateFields{
+            .name = name orelse "__SKIP__",
+            .code = code orelse "__SKIP__",
+            .status = status orelse "__SKIP__",
+            .description = description orelse "__SKIP__",
+            .acl = acl orelse "__SKIP__",
+        };
         return self.store.update(tenant_id, id, fields, self.now()) catch error.Unexpected;
     }
 

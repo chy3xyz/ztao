@@ -32,14 +32,13 @@ pub const BillingService = struct {
     }
 
     pub fn seedDefaults(self: *BillingService) !void {
-        const now = self.now();
         for (DEFAULT_PLANS) |p| {
             _ = try self.store.upsertPlan(.{
                 .code = p.code, .name = p.name,
                 .monthly_price_cents = p.monthly_price_cents,
                 .seat_limit = p.seat_limit,
                 .ai_token_monthly = p.ai_token_monthly,
-            }, now);
+            }, self.now());
         }
     }
 

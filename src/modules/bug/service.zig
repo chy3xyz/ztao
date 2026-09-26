@@ -30,7 +30,7 @@ pub const BugService = struct {
         if (severity < 1 or severity > 4) return error.InvalidSeverity;
         return self.store.create(.{
             .tenant_id = tenant_id, .product_id = product_id, .project_id = project_id,
-            .title = trimmed, .severity = severity, .type_ = type_, .steps = steps,
+            .title = trimmed, .severity = severity, .kind = type_, .steps = steps,
             .assigned_to = assigned_to, .opened_by = opened_by,
         }, self.now()) catch error.Unexpected;
     }

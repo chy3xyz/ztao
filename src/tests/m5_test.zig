@@ -47,7 +47,7 @@ test "gift_accessory: createOrder grants order id" {
     try std.testing.expect(id2 > 0);
 
     {
-        const o = (svc.getOrder(1, id1) orelse unreachable).?;
+        const o = (try svc.getOrder(1, id1)).?;
         defer o.free(allocator);
         try std.testing.expectEqualStrings("gift", o.kind);
         try std.testing.expectEqual(@as(i64, 2), o.quantity);

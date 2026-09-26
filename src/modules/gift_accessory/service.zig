@@ -77,7 +77,6 @@ pub const GiftAccessoryService = struct {
     }
 
     pub fn seedDefaults(self: *GiftAccessoryService) !void {
-        const now = self.now();
         for (DEFAULT_GIFTS) |g| {
             _ = try self.store.upsertProduct(.{
                 .kind = "gift",
@@ -85,7 +84,7 @@ pub const GiftAccessoryService = struct {
                 .image = g.image, .price_cents = g.price_cents, .original_price_cents = g.original_price_cents,
                 .stock = g.stock, .category = g.category,
                 .reward_points = g.reward_points, .sort = g.sort,
-            }, now);
+            }, self.now());
         }
         for (DEFAULT_ACCESSORIES) |a| {
             _ = try self.store.upsertProduct(.{
@@ -94,7 +93,7 @@ pub const GiftAccessoryService = struct {
                 .image = a.image, .price_cents = a.price_cents, .original_price_cents = a.original_price_cents,
                 .stock = a.stock, .category = a.category,
                 .reward_points = a.reward_points, .sort = a.sort,
-            }, now);
+            }, self.now());
         }
     }
 

@@ -28,7 +28,6 @@ pub const AgentService = struct {
 
     /// Seed the 5 default presets. Idempotent — safe to call on every boot.
     pub fn seedDefaults(self: *AgentService) !void {
-        const now = self.now();
         const presets = [_]struct {
             code: []const u8,
             name: []const u8,
@@ -87,7 +86,7 @@ pub const AgentService = struct {
                 .kind = p.kind, .system_prompt = p.sp,
                 .tools = p.tools, .capabilities = p.caps, .scopes = p.scopes,
                 .is_default = true, .sort = p.sort,
-            }, now);
+            }, self.now());
         }
     }
 
@@ -108,16 +107,17 @@ pub const AgentService = struct {
             for (presets) |p| p.free(self.allocator);
             self.allocator.free(presets);
         }
-        const now = self.now();
-        var out = std.ArrayList(AgentInstanceRow).init(self.allocator);
+        var out = std.array_list.Managed(AgentInstanceRow).init(self.allocator);
         errdefer {
             for (out.items) |r| r.free(self.allocator);
             out.deinit();
         }
         for (presets) |p| {
             if ((self.store.findInstance(tenant_id, user_id, p.id) catch return error.Unexpected)) |existing| {
-                defer existing.free(self.allocator);
-                try out.append(existing);
+                // dupInstance 已用 self.allocator 分配字符串；out.append 按值
+                // 复制结构（含字符串切片指针）→ ownership 转移给 out，
+                // 此处不能 defer existing.free，否则 out 里的 row 字符串悬空。
+                out.append(existing) catch return error.Unexpected;
                 continue;
             }
             const id = self.store.createInstance(.{
@@ -129,12 +129,12 @@ pub const AgentService = struct {
                 .avatar = p.avatar,
                 .model = "stub",
                 .max_daily_cost_cents = 5000,
-            }, now) catch return error.Unexpected;
+            }, self.now()) catch return error.Unexpected;
             const row_opt = self.store.getInstance(id) catch return error.Unexpected;
             const row = row_opt orelse continue;
-            try out.append(row);
+            out.append(row) catch return error.Unexpected;
         }
-        return out.toOwnedSlice();
+        return out.toOwnedSlice() catch return error.Unexpected;
     }
 
     pub fn listByUser(self: *AgentService, tenant_id: i64, user_id: i64) AgentError![]AgentInstanceRow {

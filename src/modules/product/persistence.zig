@@ -17,7 +17,7 @@ pub const ProductRow = struct {
     tenant_id: i64,
     name: []const u8,
     code: []const u8,
-    type_: []const u8,
+    kind: []const u8,
     status: []const u8,
     owner_id: i64,
     description: []const u8,
@@ -28,7 +28,7 @@ pub const ProductRow = struct {
     pub fn free(self: ProductRow, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
         allocator.free(self.code);
-        allocator.free(self.type_);
+        allocator.free(self.kind);
         allocator.free(self.status);
         allocator.free(self.description);
         allocator.free(self.acl);
@@ -39,10 +39,18 @@ pub const ProductListResult = struct {
     items: []ProductRow,
     total: i64,
 
-    pub fn free(self: *ProductListResult, allocator: std.mem.Allocator) void {
+    pub fn free(self: *const ProductListResult, allocator: std.mem.Allocator) void {
         for (self.items) |r| r.free(allocator);
         allocator.free(self.items);
     }
+};
+
+pub const ProductUpdateFields = struct {
+    name: []const u8 = "__SKIP__",
+    code: []const u8 = "__SKIP__",
+    status: []const u8 = "__SKIP__",
+    description: []const u8 = "__SKIP__",
+    acl: []const u8 = "__SKIP__",
 };
 
 pub const ProductStore = struct {
@@ -58,8 +66,8 @@ pub const ProductStore = struct {
         errdefer self.allocator.free(name);
         const code = try self.allocator.dupe(u8, e.code);
         errdefer self.allocator.free(code);
-        const type_ = try self.allocator.dupe(u8, e.type_);
-        errdefer self.allocator.free(type_);
+        const knd = try self.allocator.dupe(u8, e.kind);
+        errdefer self.allocator.free(knd);
         const status = try self.allocator.dupe(u8, e.status);
         errdefer self.allocator.free(status);
         const desc = try self.allocator.dupe(u8, e.description);
@@ -70,7 +78,7 @@ pub const ProductStore = struct {
             .tenant_id = e.tenant_id,
             .name = name,
             .code = code,
-            .type_ = type_,
+            .kind = knd,
             .status = status,
             .owner_id = e.owner_id,
             .description = desc,
@@ -92,7 +100,7 @@ pub const ProductStore = struct {
             .tenant_id = p.tenant_id,
             .name = p.name,
             .code = p.code,
-            .type_ = "normal",
+            .kind = "normal",
             .status = "active",
             .owner_id = p.owner_id,
             .description = p.description,
@@ -100,7 +108,7 @@ pub const ProductStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.product.deinitRow(&created);
+        defer self.client.product.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -110,7 +118,7 @@ pub const ProductStore = struct {
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.product.deinitRow(&e);
+        defer self.client.product.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 
@@ -137,25 +145,30 @@ pub const ProductStore = struct {
         return .{ .items = out, .total = paged.total };
     }
 
-    pub fn update(self: *ProductStore, tenant_id: i64, id: i64, fields: struct {
-        name: ?[]const u8 = null,
-        code: ?[]const u8 = null,
-        status: ?[]const u8 = null,
-        description: ?[]const u8 = null,
-        acl: ?[]const u8 = null,
-    }, now: i64) !bool {
+    pub fn update(self: *ProductStore, tenant_id: i64, id: i64, fields: ProductUpdateFields, now: i64) !bool {
         const preds = self.client.product.predicates;
-        var upd: zent.sql.UpdateMap = .{};
-        if (fields.name) |v| upd.name = v;
-        if (fields.code) |v| upd.code = v;
-        if (fields.status) |v| upd.status = v;
-        if (fields.description) |v| upd.description = v;
-        if (fields.acl) |v| upd.acl = v;
-        upd.updated_at = now;
-        const affected = try crud.update(self.client.product, upd, .{
-            preds.tenant_idEQ(.{ .int = tenant_id }),
-            preds.idEQ(.{ .int = id }),
-        });
+        var q = self.client.product.Update();
+        defer q.deinit();
+        // sentinel "__SKIP__" 表示不更新该字段
+        if (!std.mem.eql(u8, fields.name, "__SKIP__")) {
+            _ = try q.set("name", .{ .string = fields.name });
+        }
+        if (!std.mem.eql(u8, fields.code, "__SKIP__")) {
+            _ = try q.set("code", .{ .string = fields.code });
+        }
+        if (!std.mem.eql(u8, fields.status, "__SKIP__")) {
+            _ = try q.set("status", .{ .string = fields.status });
+        }
+        if (!std.mem.eql(u8, fields.description, "__SKIP__")) {
+            _ = try q.set("description", .{ .string = fields.description });
+        }
+        if (!std.mem.eql(u8, fields.acl, "__SKIP__")) {
+            _ = try q.set("acl", .{ .string = fields.acl });
+        }
+        _ = try q.set("updated_at", .{ .int = now });
+        _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
+        _ = try q.Where(.{preds.idEQ(.{ .int = id })});
+        const affected = try q.Save();
         return affected > 0;
     }
 

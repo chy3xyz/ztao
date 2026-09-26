@@ -53,14 +53,14 @@ pub const UsageStore = struct {
     pub fn ensureBalance(self: *UsageStore, tenant_id: i64, tokens: i64) !bool {
         const preds = self.client.compute_balance.predicates;
         var e = (try crud.first(self.client.compute_balance, .{preds.tenant_idEQ(.{ .int = tenant_id })})) orelse return false;
-        defer self.client.compute_balance.deinitRow(&e);
+        defer self.client.compute_balance.deinitRow(@constCast(&e));
         return e.balance_tokens >= tokens;
     }
 
     pub fn debit(self: *UsageStore, tenant_id: i64, tokens: i64) !bool {
         const preds = self.client.compute_balance.predicates;
         var e = (try crud.first(self.client.compute_balance, .{preds.tenant_idEQ(.{ .int = tenant_id })})) orelse return false;
-        defer self.client.compute_balance.deinitRow(&e);
+        defer self.client.compute_balance.deinitRow(@constCast(&e));
         const new_balance = e.balance_tokens - tokens;
         if (new_balance < 0) return false;
         _ = try crud.update(self.client.compute_balance, .{
@@ -71,19 +71,22 @@ pub const UsageStore = struct {
 
     pub fn credit(self: *UsageStore, tenant_id: i64, tokens: i64) !void {
         const preds = self.client.compute_balance.predicates;
+        var dummy_ts: std.c.timespec = .{ .sec = 0, .nsec = 0 };
+        _ = std.c.clock_gettime(.REALTIME, &dummy_ts);
+        const now = @as(i64, @intCast(dummy_ts.sec));
         var e = (try crud.first(self.client.compute_balance, .{preds.tenant_idEQ(.{ .int = tenant_id })})) orelse {
             var created = try crud.create(self.client.compute_balance, .{
                 .tenant_id = tenant_id,
                 .balance_tokens = tokens,
-                .period_end = std.time.timestamp() + 30 * 86400,
+                .period_end = now + 30 * 86400,
                 .plan_code = "free",
-                .created_at = std.time.timestamp(),
-                .updated_at = std.time.timestamp(),
+                .created_at = now,
+                .updated_at = now,
             });
-            defer self.client.compute_balance.deinitRow(&created);
+            defer self.client.compute_balance.deinitRow(@constCast(&created));
             return;
         };
-        defer self.client.compute_balance.deinitRow(&e);
+        defer self.client.compute_balance.deinitRow(@constCast(&e));
         _ = try crud.update(self.client.compute_balance, .{
             .balance_tokens = e.balance_tokens + tokens,
         }, .{preds.idEQ(.{ .int = e.id })});
@@ -92,7 +95,7 @@ pub const UsageStore = struct {
     pub fn getBalance(self: *UsageStore, tenant_id: i64) !?ComputeBalanceRow {
         const preds = self.client.compute_balance.predicates;
         var e = (try crud.first(self.client.compute_balance, .{preds.tenant_idEQ(.{ .int = tenant_id })})) orelse return null;
-        defer self.client.compute_balance.deinitRow(&e);
+        defer self.client.compute_balance.deinitRow(@constCast(&e));
         return .{
             .tenant_id = e.tenant_id,
             .balance_tokens = e.balance_tokens,

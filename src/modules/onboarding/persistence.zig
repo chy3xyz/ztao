@@ -43,14 +43,14 @@ pub const OnboardingStore = struct {
     pub fn get(self: *OnboardingStore, user_id: i64) !?OnboardingStateRow {
         const preds = self.client.onboarding_state.predicates;
         var e = (try crud.first(self.client.onboarding_state, .{preds.user_idEQ(.{ .int = user_id })})) orelse return null;
-        defer self.client.onboarding_state.deinitRow(&e);
+        defer self.client.onboarding_state.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 
     pub fn upsert(self: *OnboardingStore, user_id: i64, step: []const u8, now: i64) !void {
         const preds = self.client.onboarding_state.predicates;
         if ((try crud.first(self.client.onboarding_state, .{preds.user_idEQ(.{ .int = user_id })}))) |existing| {
-            defer self.client.onboarding_state.deinitRow(&existing);
+            defer self.client.onboarding_state.deinitRow(@constCast(&existing));
             _ = try crud.update(self.client.onboarding_state, .{
                 .step = step,
                 .updated_at = now,
@@ -63,6 +63,6 @@ pub const OnboardingStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.onboarding_state.deinitRow(&created);
+        defer self.client.onboarding_state.deinitRow(@constCast(&created));
     }
 };

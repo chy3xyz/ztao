@@ -163,7 +163,7 @@ test "onboarding step machine: valid advances, invalid is rejected" {
     // 顺序推进：agents_ready → first_chat
     const next1 = try svc.advance(user_id, "first_chat");
     try std.testing.expect(next1 != null);
-    try std.testing.expectEqualStrings("first_task", next1.?);
+    try std.testing.expectEqualStrings("first_task", @tagName(next1.?));
 
     // 跳级：first_task → done（M3 才用，M1 允许跳到 done）
     const next2 = try svc.advance(user_id, "done");

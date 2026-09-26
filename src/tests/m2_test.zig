@@ -28,7 +28,7 @@ test "product create / get / list / update / delete" {
     defer list.free(allocator);
     try std.testing.expectEqual(@as(usize, 1), list.items.len);
 
-    try std.testing.expect(try svc.update(1, id, .{ .status = "closed" }));
+    try std.testing.expect(try svc.update(1, id, null, null, "closed", null, null));
     {
         const r = (try svc.get(1, id)).?;
         defer r.free(allocator);
@@ -64,7 +64,10 @@ test "sprint create / list / get" {
     var store = sprint.persistence.SprintStore.init(allocator, env.client);
     var svc = sprint.service.SprintService.init(allocator, std.testing.io, &store);
 
-    const now = std.time.timestamp();
+
+    var dummy_ts: std.c.timespec = .{ .sec = 0, .nsec = 0 };
+    _ = std.c.clock_gettime(.REALTIME, &dummy_ts);
+    const now = @as(i64, @intCast(dummy_ts.sec));
     const id1 = try svc.create(1, 1, "Sprint 1", "完成登录", now, now + 7 * 86400);
     const id2 = try svc.create(1, 1, "Sprint 2", "完成支付", now, now + 7 * 86400);
     try std.testing.expect(id1 != id2);
@@ -129,8 +132,8 @@ test "pms_task create + listByProject + updateStatus + logTime" {
     {
         const r = (try svc.get(1, id)).?;
         defer r.free(allocator);
-        try std.testing.expectApproxEqAbs(@as(f32, 1.5), r.consumed, 0.001);
-        try std.testing.expectApproxEqAbs(@as(f32, 2.5), r.left, 0.001);
+        try std.testing.expectApproxEqAbs(@as(f64, 1.5), r.consumed, 0.001);
+        try std.testing.expectApproxEqAbs(@as(f64, 2.5), r.left, 0.001);
         try std.testing.expectEqualStrings("doing", r.status);
     }
 

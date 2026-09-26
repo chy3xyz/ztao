@@ -127,8 +127,8 @@ pub const AgentStore = struct {
         errdefer self.allocator.free(name);
         const avatar = try self.allocator.dupe(u8, e.avatar);
         errdefer self.allocator.free(avatar);
-        const model = try self.allocator.dupe(u8, e.model);
-        errdefer self.allocator.free(model);
+        const mstr = try self.allocator.dupe(u8, e.model);
+        errdefer self.allocator.free(mstr);
         const tools = try self.allocator.dupe(u8, e.tools_override);
         errdefer self.allocator.free(tools);
         const scopes = try self.allocator.dupe(u8, e.scopes_override);
@@ -144,7 +144,7 @@ pub const AgentStore = struct {
             .preset_code = pcode,
             .name = name,
             .avatar = avatar,
-            .model = model,
+            .model = mstr,
             .tools_override = tools,
             .scopes_override = scopes,
             .status = status,
@@ -172,7 +172,7 @@ pub const AgentStore = struct {
     }, now: i64) !i64 {
         const preds = self.client.agent_preset.predicates;
         if ((try crud.first(self.client.agent_preset, .{preds.codeEQ(.{ .string = row.code })}))) |existing| {
-            defer self.client.agent_preset.deinitRow(&existing);
+            defer self.client.agent_preset.deinitRow(@constCast(&existing));
             _ = try crud.update(self.client.agent_preset, .{
                 .name = row.name,
                 .avatar = row.avatar,
@@ -201,7 +201,7 @@ pub const AgentStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.agent_preset.deinitRow(&created);
+        defer self.client.agent_preset.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -212,14 +212,14 @@ pub const AgentStore = struct {
         _ = try q.Where(.{preds.is_defaultEQ(.{ .bool = true })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderAsc("sort")});
         var rows = try q.All();
-        defer rows.deinit();
-        var out = try self.allocator.alloc(AgentPresetRow, rows.items.items.len);
+        defer self.client.agent_preset.deinitRows(&rows);
+        var out = try self.allocator.alloc(AgentPresetRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dupPreset(e);
             n += 1;
         }
@@ -229,7 +229,7 @@ pub const AgentStore = struct {
     pub fn getPresetByCode(self: *AgentStore, code: []const u8) !?AgentPresetRow {
         const preds = self.client.agent_preset.predicates;
         var e = (try crud.first(self.client.agent_preset, .{preds.codeEQ(.{ .string = code })})) orelse return null;
-        defer self.client.agent_preset.deinitRow(&e);
+        defer self.client.agent_preset.deinitRow(@constCast(&e));
         return try self.dupPreset(e);
     }
 
@@ -242,7 +242,7 @@ pub const AgentStore = struct {
             preds.user_idEQ(.{ .int = user_id }),
             preds.preset_idEQ(.{ .int = preset_id }),
         })) orelse return null;
-        defer self.client.agent_instance.deinitRow(&e);
+        defer self.client.agent_instance.deinitRow(@constCast(&e));
         return try self.dupInstance(e);
     }
 
@@ -272,7 +272,7 @@ pub const AgentStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.agent_instance.deinitRow(&created);
+        defer self.client.agent_instance.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -282,17 +282,17 @@ pub const AgentStore = struct {
         const preds = self.client.agent_instance.predicates;
         _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
         _ = try q.Where(.{preds.user_idEQ(.{ .int = user_id })});
-        _ = try q.Where(.{preds.statusNEQ(.{ .string = "deleted" })});
+        _ = try q.Where(.{preds.statusNE(.{ .string = "deleted" })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderAsc("id")});
         var rows = try q.All();
-        defer rows.deinit();
-        var out = try self.allocator.alloc(AgentInstanceRow, rows.items.items.len);
+        defer self.client.agent_instance.deinitRows(&rows);
+        var out = try self.allocator.alloc(AgentInstanceRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dupInstance(e);
             n += 1;
         }
@@ -302,7 +302,7 @@ pub const AgentStore = struct {
     pub fn getInstance(self: *AgentStore, id: i64) !?AgentInstanceRow {
         const preds = self.client.agent_instance.predicates;
         var e = (try crud.first(self.client.agent_instance, .{preds.idEQ(.{ .int = id })})) orelse return null;
-        defer self.client.agent_instance.deinitRow(&e);
+        defer self.client.agent_instance.deinitRow(@constCast(&e));
         return try self.dupInstance(e);
     }
 };

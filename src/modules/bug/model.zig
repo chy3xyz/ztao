@@ -11,7 +11,7 @@ pub const Bug = Schema("Bug", .{
         // severity: 1=致命 2=严重 3=一般 4=轻微
         field.Int("severity").Default(3),
         // type: code | data | interface | config | security | performance | standard | automation | design | other
-        field.String("type").Default("code"),
+        field.String("kind").Default("code"),
         field.String("steps").Default(""),
         // status: active | resolved | closed
         field.String("status").Default("active"),

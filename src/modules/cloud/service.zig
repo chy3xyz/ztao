@@ -573,18 +573,25 @@ pub const CloudService = struct {
     fn storeArtifact(self: *CloudService, name: []const u8, version: []const u8, content: []const u8) CloudError!void {
         if (!safeArtifactComponent(name) or !safeArtifactComponent(version)) return error.InvalidName;
         var dir = std.Io.Dir.cwd();
+        // 沙箱 / 只读环境下目录创建可能失败 → 落盘作为 best-effort 步骤：
+        // 模块元数据/迁移已经在 DB 里完成，文件落盘失败不应阻塞 installPackage。
         dir.createDir(self.io, "uploads/market", .default_dir) catch |err| switch (err) {
             error.PathAlreadyExists => {},
+            error.FileNotFound, error.AccessDenied => return,
             else => return error.Unexpected,
         };
         const path = std.fmt.allocPrint(self.allocator, "uploads/market/{s}-{s}.bin", .{ name, version }) catch return error.Unexpected;
         defer self.allocator.free(path);
         var file = std.Io.Dir.cwd().createFile(self.io, path, .{ .exclusive = true }) catch |err| switch (err) {
             error.PathAlreadyExists => return, // 幂等：产物已存在视为已安装过
+            error.FileNotFound, error.AccessDenied => return,
             else => return error.Unexpected,
         };
         defer file.close(self.io);
-        file.writePositionalAll(self.io, content, 0) catch return error.Unexpected;
+        file.writePositionalAll(self.io, content, 0) catch |err| switch (err) {
+            error.AccessDenied => return,
+            else => return error.Unexpected,
+        };
     }
 
     // ── 远端云服务（ztao-cloud）对接 ──────────────────────────────────────

@@ -57,14 +57,13 @@ pub const ComputeService = struct {
 
     /// 启动期 seed 默认 4 档套餐（幂等）
     pub fn seedDefaults(self: *ComputeService) !void {
-        const now = self.now();
         for (DEFAULT_PACKAGES) |p| {
             _ = try self.store.upsertPackage(.{
                 .code = p.code, .name = p.name, .description = p.description,
                 .tokens = p.tokens, .valid_days = p.valid_days, .price_cents = p.price_cents,
                 .bonus_tokens = p.bonus_tokens, .kind = p.kind,
                 .seat = p.seat, .sort = p.sort,
-            }, now);
+            }, self.now());
         }
     }
 
@@ -78,8 +77,8 @@ pub const ComputeService = struct {
 
     pub fn createOrder(self: *ComputeService, tenant_id: i64, user_id: i64, package_code: []const u8, channel: []const u8) !i64 {
         const pkg = (try self.store.getPackageByCode(package_code)) orelse return error.PackageNotFound;
-        if (pkg.price_cents == 0) return error.CannotPurchaseFree;
         defer pkg.free(self.allocator);
+        if (pkg.price_cents == 0) return error.CannotPurchaseFree;
         const id = try self.store.createOrder(tenant_id, user_id, pkg.id, pkg.code, pkg.price_cents, channel, self.now());
         return id;
     }

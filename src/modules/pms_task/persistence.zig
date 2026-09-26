@@ -17,11 +17,11 @@ pub const PmsTaskRow = struct {
     story_id: i64,
     parent_id: i64,
     name: []const u8,
-    type_: []const u8,
+    kind: []const u8,
     pri: i64,
-    estimate: f32,
-    consumed: f32,
-    left: f32,
+    estimate: f64,
+    consumed: f64,
+    left: f64,
     status: []const u8,
     assigned_to: i64,
     assignee_kind: []const u8,
@@ -34,7 +34,7 @@ pub const PmsTaskRow = struct {
 
     pub fn free(self: PmsTaskRow, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
-        allocator.free(self.type_);
+        allocator.free(self.kind);
         allocator.free(self.status);
         allocator.free(self.assignee_kind);
     }
@@ -44,7 +44,7 @@ pub const PmsTaskListResult = struct {
     items: []PmsTaskRow,
     total: i64,
 
-    pub fn free(self: *PmsTaskListResult, allocator: std.mem.Allocator) void {
+    pub fn free(self: *const PmsTaskListResult, allocator: std.mem.Allocator) void {
         for (self.items) |r| r.free(allocator);
         allocator.free(self.items);
     }
@@ -61,8 +61,8 @@ pub const PmsTaskStore = struct {
     fn dup(self: *PmsTaskStore, e: anytype) !PmsTaskRow {
         const name = try self.allocator.dupe(u8, e.name);
         errdefer self.allocator.free(name);
-        const type_ = try self.allocator.dupe(u8, e.type_);
-        errdefer self.allocator.free(type_);
+        const knd = try self.allocator.dupe(u8, e.kind);
+        errdefer self.allocator.free(knd);
         const status = try self.allocator.dupe(u8, e.status);
         errdefer self.allocator.free(status);
         const kind = try self.allocator.dupe(u8, e.assignee_kind);
@@ -74,7 +74,7 @@ pub const PmsTaskStore = struct {
             .story_id = e.story_id,
             .parent_id = e.parent_id,
             .name = name,
-            .type_ = type_,
+            .kind = knd,
             .pri = e.pri,
             .estimate = e.estimate,
             .consumed = e.consumed,
@@ -93,7 +93,7 @@ pub const PmsTaskStore = struct {
 
     pub fn create(self: *PmsTaskStore, t: struct {
         tenant_id: i64, project_id: i64, sprint_id: i64, story_id: i64,
-        name: []const u8, pri: i64, estimate: f32, left: f32,
+        name: []const u8, pri: i64, estimate: f64, left: f64,
         assigned_to: i64, assignee_kind: []const u8,
         ai_assisted: bool,
     }, now: i64) !i64 {
@@ -104,10 +104,10 @@ pub const PmsTaskStore = struct {
             .story_id = t.story_id,
             .parent_id = 0,
             .name = t.name,
-            .type_ = "task",
+            .kind = "task",
             .pri = t.pri,
             .estimate = t.estimate,
-            .consumed = 0,
+            .consumed = @as(f64, 0),
             .left = t.left,
             .status = "wait",
             .assigned_to = t.assigned_to,
@@ -119,7 +119,7 @@ pub const PmsTaskStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.pms_task.deinitRow(&created);
+        defer self.client.pms_task.deinitRow(@constCast(&created));
         return created.id;
     }
 
@@ -129,7 +129,7 @@ pub const PmsTaskStore = struct {
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.pms_task.deinitRow(&e);
+        defer self.client.pms_task.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 
@@ -179,13 +179,12 @@ pub const PmsTaskStore = struct {
 
     pub fn updateStatus(self: *PmsTaskStore, tenant_id: i64, id: i64, status: []const u8, finished_by: i64, now: i64) !bool {
         const preds = self.client.pms_task.predicates;
-        var upd: zent.sql.UpdateMap = .{};
-        upd.status = status;
-        upd.updated_at = now;
-        if (std.mem.eql(u8, status, "done")) {
-            upd.finished_by = finished_by;
-            upd.finished_at = now;
-        }
+        const upd = .{
+            .status = status,
+            .updated_at = now,
+            .finished_by = if (std.mem.eql(u8, status, "done")) finished_by else @as(i64, 0),
+            .finished_at = if (std.mem.eql(u8, status, "done")) now else @as(i64, 0),
+        };
         const affected = try crud.update(self.client.pms_task, upd, .{
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
@@ -193,12 +192,12 @@ pub const PmsTaskStore = struct {
         return affected > 0;
     }
 
-    pub fn logTime(self: *PmsTaskStore, tenant_id: i64, id: i64, hours: f32, now: i64) !bool {
+    pub fn logTime(self: *PmsTaskStore, tenant_id: i64, id: i64, hours: f64, now: i64) !bool {
         const preds = self.client.pms_task.predicates;
         const row = (try self.getById(tenant_id, id)) orelse return false;
         defer row.free(self.allocator);
         const new_consumed = row.consumed + hours;
-        const new_left = if (row.left > hours) row.left - hours else @as(f32, 0);
+        const new_left = if (row.left > hours) row.left - hours else @as(f64, 0);
         const affected = try crud.update(self.client.pms_task, .{
             .consumed = new_consumed,
             .left = new_left,

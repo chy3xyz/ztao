@@ -28,8 +28,12 @@ pub const UsageService = struct {
         const days_since_epoch = @divFloor(epoch_seconds, 86400);
         // 简化版：用天数做 period（实际用 YYYY-MM；M3 占位）
         var buf: [16]u8 = undefined;
-        const slice = std.fmt.bufPrint(&buf, "d{d}", .{ days_since_epoch }) catch "0";
-        return slice[0..16].*;
+        const slice = std.fmt.bufPrint(buf[0..], "d{d}", .{days_since_epoch}) catch "0";
+        // 拷贝实际写入的字节到定长返回槽（剩余部分清零），避免越界。
+        var out: [16]u8 = @splat(0);
+        const copy_len = @min(slice.len, out.len);
+        @memcpy(out[0..copy_len], slice[0..copy_len]);
+        return out;
     }
 
     /// 记录一次 AI 调用（输入 + 输出 token）

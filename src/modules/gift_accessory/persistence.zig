@@ -151,10 +151,10 @@ pub const GiftAccessoryStore = struct {
         image: []const u8, price_cents: i64, original_price_cents: i64,
         stock: i64, category: []const u8, reward_points: i64, sort: i64,
     }, now: i64) !i64 {
-        const preds = self.client.gift_accessory_product.predicates;
-        if ((try crud.first(self.client.gift_accessory_product, .{preds.codeEQ(.{ .string = p.code })}))) |existing| {
-            defer self.client.gift_accessory_product.deinitRow(&existing);
-            _ = try crud.update(self.client.gift_accessory_product, .{
+        const preds = self.client.mall_product.predicates;
+        if ((try crud.first(self.client.mall_product, .{preds.codeEQ(.{ .string = p.code })}))) |existing| {
+            defer self.client.mall_product.deinitRow(@constCast(&existing));
+            _ = try crud.update(self.client.mall_product, .{
                 .kind = p.kind,
                 .name = p.name,
                 .description = p.description,
@@ -170,7 +170,7 @@ pub const GiftAccessoryStore = struct {
             }, .{preds.idEQ(.{ .int = existing.id })});
             return existing.id;
         }
-        var created = try crud.create(self.client.gift_accessory_product, .{
+        var created = try crud.create(self.client.mall_product, .{
             .tenant_id = 1,
             .kind = p.kind,
             .code = p.code,
@@ -188,26 +188,26 @@ pub const GiftAccessoryStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.gift_accessory_product.deinitRow(&created);
+        defer self.client.mall_product.deinitRow(@constCast(&created));
         return created.id;
     }
 
     pub fn listByKind(self: *GiftAccessoryStore, kind: []const u8) ![]ProductRow {
-        var q = self.client.gift_accessory_product.Query();
+        var q = self.client.mall_product.Query();
         defer q.deinit();
-        const preds = self.client.gift_accessory_product.predicates;
+        const preds = self.client.mall_product.predicates;
         _ = try q.Where(.{preds.kindEQ(.{ .string = kind })});
         _ = try q.Where(.{preds.statusEQ(.{ .string = "on" })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderAsc("sort")});
         var rows = try q.All();
-        defer rows.deinit();
-        var out = try self.allocator.alloc(ProductRow, rows.items.items.len);
+        defer self.client.mall_product.deinitRows(&rows);
+        var out = try self.allocator.alloc(ProductRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dupProduct(e);
             n += 1;
         }
@@ -215,14 +215,14 @@ pub const GiftAccessoryStore = struct {
     }
 
     pub fn getByCode(self: *GiftAccessoryStore, code: []const u8) !?ProductRow {
-        const preds = self.client.gift_accessory_product.predicates;
-        var e = (try crud.first(self.client.gift_accessory_product, .{preds.codeEQ(.{ .string = code })})) orelse return null;
-        defer self.client.gift_accessory_product.deinitRow(&e);
+        const preds = self.client.mall_product.predicates;
+        var e = (try crud.first(self.client.mall_product, .{preds.codeEQ(.{ .string = code })})) orelse return null;
+        defer self.client.mall_product.deinitRow(@constCast(&e));
         return try self.dupProduct(e);
     }
 
     pub fn createOrder(self: *GiftAccessoryStore, tenant_id: i64, user_id: i64, kind: []const u8, code: []const u8, qty: i64, amount_cents: i64, now: i64) !i64 {
-        var created = try crud.create(self.client.gift_accessory_order, .{
+        var created = try crud.create(self.client.product_order, .{
             .tenant_id = tenant_id,
             .user_id = user_id,
             .kind = kind,
@@ -239,36 +239,36 @@ pub const GiftAccessoryStore = struct {
             .created_at = now,
             .updated_at = now,
         });
-        defer self.client.gift_accessory_order.deinitRow(&created);
+        defer self.client.product_order.deinitRow(@constCast(&created));
         return created.id;
     }
 
     pub fn getOrder(self: *GiftAccessoryStore, tenant_id: i64, id: i64) !?ProductOrderRow {
-        const preds = self.client.gift_accessory_order.predicates;
-        var e = (try crud.first(self.client.gift_accessory_order, .{
+        const preds = self.client.product_order.predicates;
+        var e = (try crud.first(self.client.product_order, .{
             preds.tenant_idEQ(.{ .int = tenant_id }),
             preds.idEQ(.{ .int = id }),
         })) orelse return null;
-        defer self.client.gift_accessory_order.deinitRow(&e);
+        defer self.client.product_order.deinitRow(@constCast(&e));
         return try self.dupOrder(e);
     }
 
     pub fn listOrdersByUser(self: *GiftAccessoryStore, tenant_id: i64, user_id: i64) ![]ProductOrderRow {
-        var q = self.client.gift_accessory_order.Query();
+        var q = self.client.product_order.Query();
         defer q.deinit();
-        const preds = self.client.gift_accessory_order.predicates;
+        const preds = self.client.product_order.predicates;
         _ = try q.Where(.{preds.tenant_idEQ(.{ .int = tenant_id })});
         _ = try q.Where(.{preds.user_idEQ(.{ .int = user_id })});
         _ = try q.OrderBy(&[_]zent.sql.Order{zent.sql.OrderDesc("id")});
         var rows = try q.All();
-        defer rows.deinit();
-        var out = try self.allocator.alloc(ProductOrderRow, rows.items.items.len);
+        defer self.client.product_order.deinitRows(&rows);
+        var out = try self.allocator.alloc(ProductOrderRow, rows.items.len);
         var n: usize = 0;
         errdefer {
             for (out[0..n]) |r| r.free(self.allocator);
             self.allocator.free(out);
         }
-        for (rows.items.items) |e| {
+        for (rows.items) |e| {
             out[n] = try self.dupOrder(e);
             n += 1;
         }

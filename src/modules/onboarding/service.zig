@@ -45,6 +45,7 @@ pub const OnboardingError = error{
     InvalidStep,
     StepRegress,
     AlreadyDone,
+    Unexpected,
 };
 
 pub const OnboardingService = struct {
@@ -79,19 +80,18 @@ pub const OnboardingService = struct {
     /// Advance one step. Validates the target step is reachable from the current.
     pub fn advance(self: *OnboardingService, user_id: i64, target: []const u8) OnboardingError!?Step {
         const target_step = Step.fromStr(target) orelse return error.InvalidStep;
-        const cur_row = try self.get(user_id);
+        const cur_row = self.get(user_id) catch return error.Unexpected;
         defer cur_row.free(self.allocator);
         const cur = Step.fromStr(cur_row.step) orelse .login;
 
         if (target_step == .done and cur == .done) return error.AlreadyDone;
-        // Walk forward; reject if target is behind current.
         var s: ?Step = cur;
         while (s) |v| : (s = v.next()) {
             if (v == target_step) {
-                try self.store.upsert(user_id, target, self.now());
-                    return target_step.next();
-                }
-                if (v == .done) break;
+                self.store.upsert(user_id, target, self.now()) catch return error.Unexpected;
+                return target_step.next();
+            }
+            if (v == .done) break;
         }
         return error.StepRegress;
     }

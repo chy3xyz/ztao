@@ -12,7 +12,7 @@ pub const Product = Schema("Product", .{
         field.Int("tenant_id").Default(1),
         field.String("name"),
         field.String("code").Default(""),
-        field.String("type").Default("normal"),     // normal | multi
+        field.String("kind").Default("normal"),     // normal | multi
         field.String("status").Default("active"),  // active | closed | archived
         field.Int("owner_id").Default(0),
         field.String("description").Default(""),

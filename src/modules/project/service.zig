@@ -28,7 +28,7 @@ pub const ProjectService = struct {
         if (trimmed.len == 0) return error.InvalidName;
         return self.store.create(.{
             .tenant_id = tenant_id, .product_id = product_id,
-            .name = trimmed, .code = code, .model = model, .owner_id = owner_id,
+            .name = trimmed, .code = code, .mdl = model, .owner_id = owner_id,
         }, self.now()) catch error.Unexpected;
     }
 

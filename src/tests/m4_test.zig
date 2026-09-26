@@ -22,7 +22,7 @@ test "compute: seedDefaults lists 4 active packages" {
     }
     try std.testing.expect(list.len >= 4);
 
-    const pro = (svc.getPackageByCode("pro") orelse unreachable).?;
+    const pro = (try svc.getPackageByCode("pro")).?;
     defer pro.free(allocator);
     try std.testing.expectEqualStrings("pro", pro.code);
     try std.testing.expect(pro.tokens > 0);
@@ -42,7 +42,7 @@ test "compute: createOrder + markPaid grants tokens" {
     try std.testing.expect(order_id > 0);
 
     {
-        const o = (svc.getOrder(1, order_id) orelse unreachable).?;
+        const o = (try svc.getOrder(1, order_id)).?;
         defer o.free(allocator);
         try std.testing.expectEqualStrings("pending", o.status);
         try std.testing.expect(o.amount_cents > 0);
@@ -53,7 +53,7 @@ test "compute: createOrder + markPaid grants tokens" {
     try std.testing.expect(granted > 0);
 
     {
-        const o = (svc.getOrder(1, order_id) orelse unreachable).?;
+        const o = (try svc.getOrder(1, order_id)).?;
         defer o.free(allocator);
         try std.testing.expectEqualStrings("paid", o.status);
         try std.testing.expect(o.paid_at > 0);
@@ -109,7 +109,7 @@ test "billing: seedDefaults + ensureSubscription idempotent" {
     try std.testing.expect(sub1 == sub2);
 
     {
-        const sub = (svc.getSubscription(1) orelse unreachable).?;
+        const sub = (try svc.getSubscription(1)).?;
         defer sub.free(allocator);
         try std.testing.expectEqualStrings("free", sub.plan_code);
     }
@@ -123,7 +123,7 @@ test "billing: getPlan returns valid row" {
     var svc = billing.service.BillingService.init(allocator, std.testing.io, &store);
 
     try svc.seedDefaults();
-    const plan = (svc.getPlan("team") orelse unreachable).?;
+    const plan = (try svc.getPlan("team")).?;
     defer plan.free(allocator);
     try std.testing.expectEqualStrings("team", plan.code);
     try std.testing.expect(plan.seat_limit >= 5);

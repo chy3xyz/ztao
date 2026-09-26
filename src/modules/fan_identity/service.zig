@@ -5,6 +5,7 @@ const zigmodu = @import("zigmodu");
 const persist = @import("persistence.zig");
 
 pub const UserIdentityRow = persist.UserIdentityRow;
+pub const BindFields = persist.BindFields;
 
 pub const UserIdentityService = struct {
     allocator: std.mem.Allocator,
@@ -23,14 +24,7 @@ pub const UserIdentityService = struct {
         return self.store.findByOpenid(channel, appid, openid);
     }
 
-    pub fn bind(self: *UserIdentityService, row: struct {
-        user_id: i64,
-        channel: []const u8,
-        appid: []const u8,
-        openid: []const u8,
-        unionid: []const u8,
-        encrypted_session_key: []const u8,
-    }) !i64 {
+    pub fn bind(self: *UserIdentityService, row: BindFields) !i64 {
         const id = try self.store.create(row, self.now());
         return id;
     }

@@ -144,7 +144,8 @@ pub const UserService = struct {
         // （free 是 no-op）→ 必须用拥有者释放，否则每次登录泄漏一份哈希。
         defer self.store.allocator.free(hash);
 
-        if (!self.sec.module.verifyPassword(password, hash)) return null;
+        const pass_ok = self.sec.module.verifyPassword(password, hash) catch return error.InvalidCredentials;
+        if (!pass_ok) return null;
         return self.issueSession(allocator, row.email, row.admin, row.tenant_id) catch return error.InvalidCredentials;
     }
 
@@ -273,7 +274,8 @@ pub const UserService = struct {
             self.store.deleteTokensForUser(user_id) catch {};
             return error.TokenExpired;
         }
-        if (!self.sec.module.verifyPassword(raw_token, tok.token)) return error.InvalidToken;
+        const tok_ok = self.sec.module.verifyPassword(raw_token, tok.token) catch return error.InvalidToken;
+        if (!tok_ok) return error.InvalidToken;
     }
 
     /// Reset a user's password after a valid token; clears all their tokens.
@@ -320,7 +322,8 @@ pub const UserService = struct {
             self.store.deleteEmailVerificationsForUser(user_id) catch {};
             return error.TokenExpired;
         }
-        if (!self.sec.module.verifyPassword(raw_token, tok.token)) return error.InvalidToken;
+        const tok_ok = self.sec.module.verifyPassword(raw_token, tok.token) catch return error.InvalidToken;
+        if (!tok_ok) return error.InvalidToken;
 
         self.setVerified(user_id, true) catch return error.InvalidToken;
         // Best-effort：邮箱已置为已验证,这里只是清理已消费的令牌；删除失败时残留
@@ -335,7 +338,8 @@ pub const UserService = struct {
         const hash_opt = self.store.getPasswordHashById(id) catch return error.InvalidCredentials;
         const hash = hash_opt orelse return error.InvalidCredentials;
         defer self.sec.module.allocator.free(hash);
-        if (!self.sec.module.verifyPassword(old_password, hash)) return error.InvalidCredentials;
+        const old_ok = self.sec.module.verifyPassword(old_password, hash) catch return error.InvalidCredentials;
+        if (!old_ok) return error.InvalidCredentials;
         self.setPassword(id, new_password) catch return error.InvalidPassword;
     }
 };

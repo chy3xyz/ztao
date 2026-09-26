@@ -9,11 +9,11 @@ pub const Project = Schema("Project", .{
         field.String("name"),
         field.String("code").Default(""),
         // type: internal | external 内外项目
-        field.String("type").Default("internal"),
+        field.String("kind").Default("internal"),
         // status: wait | doing | suspended | closed | done
         field.String("status").Default("wait"),
         // model: scrum | kanban | waterfall | empty
-        field.String("model").Default("scrum"),
+        field.String("mdl").Default("scrum"),
         field.Int("parent_id").Default(0),       // 父子项目
         field.Int("begin").Default(0),
         field.Int("end").Default(0),

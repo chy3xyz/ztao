@@ -31,6 +31,15 @@ pub const UserIdentityRow = struct {
     }
 };
 
+pub const BindFields = struct {
+    user_id: i64,
+    channel: []const u8,
+    appid: []const u8,
+    openid: []const u8,
+    unionid: []const u8,
+    encrypted_session_key: []const u8,
+};
+
 pub const UserIdentityStore = struct {
     allocator: std.mem.Allocator,
     client: Client,
@@ -70,19 +79,12 @@ pub const UserIdentityStore = struct {
             preds.appidEQ(.{ .string = appid }),
             preds.openidEQ(.{ .string = openid }),
         })) orelse return null;
-        defer self.client.user_identity.deinitRow(&e);
+        defer self.client.user_identity.deinitRow(@constCast(&e));
         return try self.dup(e);
     }
 
     /// Insert a fresh identity row.
-    pub fn create(self: *UserIdentityStore, row: struct {
-        user_id: i64,
-        channel: []const u8,
-        appid: []const u8,
-        openid: []const u8,
-        unionid: []const u8,
-        encrypted_session_key: []const u8,
-    }, now: i64) !i64 {
+    pub fn create(self: *UserIdentityStore, row: BindFields, now: i64) !i64 {
         var created = try crud.create(self.client.user_identity, .{
             .user_id = row.user_id,
             .channel = row.channel,
@@ -93,7 +95,7 @@ pub const UserIdentityStore = struct {
             .created_at = now,
             .last_used_at = now,
         });
-        defer self.client.user_identity.deinitRow(&created);
+        defer self.client.user_identity.deinitRow(@constCast(&created));
         return created.id;
     }
 

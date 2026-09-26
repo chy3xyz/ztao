@@ -7,7 +7,7 @@ const zent = @import("zent");
 const field = zent.core.field;
 const Schema = zent.core.schema.Schema;
 
-pub const Product = Schema("Product", .{
+pub const Product = Schema("MallProduct", .{
     .fields = &.{
         field.Int("tenant_id").Default(1),
         // kind: gift | accessory
