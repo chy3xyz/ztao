@@ -71,6 +71,14 @@ pub fn StoreEnv(comptime ClientInfos: anytype, comptime MigrateGroups: anytype) 
             return zent.sql_postgres.PostgresDriver.connect(allocator, c.dsn);
         }
 
+        /// 把 schema 迁移从 `open` 抽出：避免 zig 0.17 ReleaseSafe 在 open
+        /// prologue 内 comptime 展开 36 次 migrateSchema 触发栈溢出。
+        fn runMigrations(allocator: std.mem.Allocator, d: zent.sql_driver.Driver) !void {
+            inline for (MigrateGroups) |gi| {
+                try zent.sql_schema.migrateSchema(allocator, d, gi);
+            }
+        }
+
         pub fn asDriver(self: *const Self) zent.sql_driver.Driver {
             return switch (self.kind) {
                 .sqlite => self.sqlite_pool.?.asDriver(),
@@ -118,9 +126,10 @@ pub fn StoreEnv(comptime ClientInfos: anytype, comptime MigrateGroups: anytype) 
                     });
                     errdefer pool.deinit();
                     const d = pool.asDriver();
-                    inline for (MigrateGroups) |gi| {
-                        try zent.sql_schema.migrateSchema(allocator, d, gi);
-                    }
+                    // MigrateGroups 是 comptime []const []const TypeInfo，把迁移
+                    // 抽到 helper 函数避免 open() prologue 内 comptime 展开 36 次
+                    // migrateSchema 在 zig 0.17 ReleaseSafe 下触发栈膨胀。
+                    try runMigrations(allocator, d);
                     self.sqlite_ctx = ctx;
                     self.sqlite_pool = pool;
                     self.client = zent.codegen.client.makeClient(ClientInfos, allocator, d);
@@ -150,9 +159,7 @@ pub fn StoreEnv(comptime ClientInfos: anytype, comptime MigrateGroups: anytype) 
                     // pool.deinit() 关闭时 PG 会自动释放会话级咨询锁,
                     // 不会挡住后续实例启动,故吞掉。
                     errdefer _ = d.exec("SELECT pg_advisory_unlock(1515040593)", &.{}) catch {};
-                    inline for (MigrateGroups) |gi| {
-                        try zent.sql_schema.migrateSchema(allocator, d, gi);
-                    }
+                    try runMigrations(allocator, d);
                     _ = try d.exec("SELECT pg_advisory_unlock(1515040593)", &.{});
                     self.pg_ctx = ctx;
                     self.pg_pool = pool;

@@ -34,3 +34,11 @@ web/src/**/*.local.ts
 # zig debug
 *.pdb
 *.dSYM/
+
+# Local SQLite database + WAL (开发态本地文件，不入仓)
+ztao.db
+ztao.db-shm
+ztao.db-wal
+
+# vendor/ 目录是 .path 依赖的工作副本（每个子目录自带 .git）
+uploads/
