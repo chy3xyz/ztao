@@ -618,16 +618,16 @@ pub fn main(init: std.process.Init) !void {
     try server.addMiddleware(real_ip_mod.realIp());
     try server.addMiddleware(request_log_mod.requestLog());
     try server.addMiddleware(metrics.middleware());
-    try server.addMiddleware(sec_headers.securityHeaders());
+    try server.addMiddleware(try sec_headers.securityHeaders());
     try server.addMiddleware(envelope_mw.ruoyiEnvelope());
     try server.addMiddleware(access_log.middleware());
-    try server.addMiddleware(zigmodu.http.http_middleware.cors(.{ .allow_origins = origins }));
+    try server.addMiddleware(try zigmodu.http.http_middleware.cors(.{ .allow_origins = origins }));
     try server.addMiddleware(license_mw.licenseGate(&cloud_svc));
 
     var slot: zigmodu.http.CatalogSlot = .{};
     defer slot.deinit();
 
-    try server.addMiddleware(zigmodu.http.http_middleware.jwtAuthFromCatalogWithPermissions(
+    try server.addMiddleware(try zigmodu.http.http_middleware.jwtAuthFromCatalogWithPermissions(
         &sec.module,
         &slot,
         catalog_permissions.load,
@@ -645,7 +645,7 @@ pub fn main(init: std.process.Init) !void {
             },
         },
     ));
-    try server.addMiddleware(zigmodu.http.http_middleware.permissionGateWith(&slot, .{ .mode = .rbac }));
+    try server.addMiddleware(try zigmodu.http.http_middleware.permissionGateWith(&slot, .{ .mode = .rbac }));
     try server.addMiddleware(mw.tokenVersionGuard(&sec, &store));
 
     var app_state: void = {};
@@ -705,7 +705,7 @@ pub fn main(init: std.process.Init) !void {
     try server.addRoute(.{
         .method = .GET,
         .path = "openapi.json",
-        .handler = zigmodu.http.openApiFromCatalog(&slot, .{
+        .handler = try zigmodu.http.openApiFromCatalog(&slot, .{
             .title = "ztao",
             .version = "0.1.0",
             .description = "ztao ComptimeRouter catalog (live)",
